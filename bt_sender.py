@@ -1,15 +1,15 @@
 import bluetooth
 
 if __name__ == '__main__':
-    targetMac = '00:1f:e1:dd:08:3d'
+    file_name = 'lake.jpg'
+    targetMac = '3c:f8:62:76:9a:89'
     port = 4
     
     sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     sock.connect((targetMac, port))
 
-    while 1:
-        text = input()
-        if text == "quit":
-            break
-        sock.send(text)
+    f = open(f'./repository/tx_{file_name}', 'rb')
+    sock.send(f.read())
+    f.close()
+
     sock.close()
