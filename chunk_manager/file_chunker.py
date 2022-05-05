@@ -1,0 +1,11 @@
+class FileChunker:
+    def __init__(self, file_path, chunk_size=1000):
+        self.file = open(file_path, 'rb')
+        self.chunk_size = chunk_size
+
+    def get_next_chunk(self):
+        chunk = self.file.read(self.chunk_size)
+        return chunk if chunk != b'' else None
+
+    def close_file(self):
+        self.file.close()
