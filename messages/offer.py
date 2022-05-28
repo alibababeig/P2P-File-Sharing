@@ -59,4 +59,7 @@ class Offer:
                 'size': filesize
             })
 
+        if cursor != len(self.bytes):
+            raise ValueError()
+            
         self.matching_files = matching_files
