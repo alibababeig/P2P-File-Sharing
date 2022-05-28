@@ -33,17 +33,18 @@ class P2PFileSharing:
 
         threading.Thread(target=self.__listen).start()
 
-    def request_file(self, filename):  # TODO: Change name
+    def request_file(self, filename):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-        filename_length = len(filename).to_bytes(
-            FILENAME_LENGTH_BYTES, ENDIANNESS)
+        discovery = Discovery()
+        discovery.set_filename(filename)
 
-        # TODO: use Discovery class
-        data = filename_length + filename.encode('utf-8')
-        sock.sendto(data, (BROADCAST_ADDR, BROADCAST_PORT))
+        sock.sendto(discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
+
+        # TODO: Get offers
+
         sock.close()
 
     def __listen(self):
