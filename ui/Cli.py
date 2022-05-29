@@ -1,9 +1,28 @@
-from importlib.metadata import files
-from os import stat
-
-
 class Cli:
     offer_row = '{: <5}{: <25}{: <13}{:}'
+
+    @staticmethod
+    def choose_offer(offers):
+        offer_cnt = 0
+        for _, matching_files in offers.items():
+            offer_cnt += len(matching_files)
+
+        valid = False
+        while not valid:
+            choice = input('Choose one of the above offers: ')
+            try:
+                choice = int(choice)
+            except:
+                pass
+            valid = choice in range(1, offer_cnt + 1)
+            if not valid:
+                print('Invalid choice! Please try again.')
+
+        for offerer, matching_files in offers.items():
+            for dic in matching_files:
+                choice -= 1
+                if choice == 0:
+                    return (offerer, dic)
 
     @staticmethod
     def show_offers(offers):
