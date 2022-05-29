@@ -21,8 +21,12 @@ class Discovery:
 
     def set_bytes(self, _bytes):
         self.bytes = _bytes
+        if len(_bytes) < FILENAME_LENGTH_BYTES:
+            raise ValueError()
+
         filename_length = int.from_bytes(
             _bytes[:FILENAME_LENGTH_BYTES], ENDIANNESS)
         if len(_bytes) != FILENAME_LENGTH_BYTES + filename_length:
             raise ValueError()
+
         self.filename = _bytes[FILENAME_LENGTH_BYTES:].decode('utf-8')

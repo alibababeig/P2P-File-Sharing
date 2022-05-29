@@ -59,31 +59,40 @@ class P2PFileSharing:
 
     def __listen(self):
         buffer = defaultdict(bytes)
+        timestamps = defaultdict(int)
         current_client = None
+
         while True:
             if current_client is None:
                 rec_bytes, client = self.listener_sock.recvfrom(
                     FILENAME_LENGTH_BYTES)
+                if timestamps[client] == 0:
+                    timestamps[client] = time.time()
                 buffer[client] += rec_bytes
                 current_client = client
 
             else:
                 discovery = Discovery()
                 try:
+                    # The following line may raise an exception
                     discovery.set_bytes(buffer[current_client])
-                except Exception:
-                    # TODO: add some timeout mechanism
-                    rec_bytes, client = self.listener_sock.recvfrom(
-                        FILENAME_LENGTH_BYTES)
-                    buffer[client] += rec_bytes
-                    continue
+                    self.__send_offer(discovery.get_filename, current_client)
+                except ValueError:
+                    if not self.__is_expired(timestamps[current_client]):
+                        rec_bytes, client = self.listener_sock.recvfrom(
+                            FILENAME_LENGTH_BYTES)
+                        if timestamps[client] == 0:
+                            timestamps[client] = time.time()
+                        buffer[client] += rec_bytes
+                        continue
+                finally:
+                    del buffer[current_client]
+                    del timestamps[current_client]
 
-                self.__send_offer(discovery.get_filename, current_client)
-                del buffer[current_client]
-                if len(list(buffer.keys())) > 0:
-                    current_client = list(buffer.keys())[0]
-                else:
-                    current_client = None
+                    if len(list(buffer.keys())) > 0:
+                        current_client = list(buffer.keys())[0]
+                    else:
+                        current_client = None
 
     def __send_offer(self, req_filename, client):
         tx_filenames = [
@@ -127,10 +136,10 @@ class P2PFileSharing:
             else:
                 offer = Offer()
                 try:
-                    # The following line may raises an exception
+                    # The following line may raise an exception
                     offer.set_bytes(buffer[current_offerer])
                     offers[current_offerer] = offer.get_matching_files()
-                except Exception:
+                except ValueError:
                     if not self.__is_expired(timestamps[current_offerer]):
                         rec_bytes, offerer = self.discovery_sock.recvfrom(
                             FILENAME_LENGTH_BYTES)
