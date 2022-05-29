@@ -1,14 +1,19 @@
 import os
 import random
-import socket
 import threading
-from collections import defaultdict
 import time
+
+from collections import defaultdict
+
+from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, \
+    SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST
 
 from messages.ack import Ack
 from messages.discovery import Discovery
 from messages.offer import Offer
+
 from ui.Cli import Cli
+
 
 FILENAME_LENGTH_BYTES = 2
 ENDIANNESS = 'little'
@@ -26,19 +31,14 @@ OFFER_TIMEOUT = 5  # seconds
 class P2PFileSharing:
     def __init__(self):
         self.discovery_sock = None
-
-        self.listener_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.listener_sock.setsockopt(
-            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.listener_sock.setsockopt(
-            socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.listener_sock.bind('', BROADCAST_PORT)
-
-        self.offerer_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+        self.offerer_sock = socket(AF_INET, SOCK_DGRAM)
+        self.data_receiver_sock = None
         self.data_sender_sock = None  # TODO
 
-        self.data_receiver_sock = None  # TODO
+        self.listener_sock = socket(AF_INET, SOCK_DGRAM)
+        self.listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        self.listener_sock.bind('', BROADCAST_PORT)
 
         threading.Thread(target=self.__listen).start()
 
@@ -54,11 +54,9 @@ class P2PFileSharing:
         self.discovery_sock.close()
 
     def __send_discovery(self, req_filename):
-        self.discovery_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.discovery_sock.setsockopt(
-            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.discovery_sock.setsockopt(
-            socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.discovery_sock = socket(AF_INET, SOCK_DGRAM)
+        self.discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
         discovery = Discovery()
         discovery.set_filename(req_filename)
@@ -172,8 +170,7 @@ class P2PFileSharing:
         filename = dic['name']
 
         port_number = random.randint(1024, 65535)
-        self.data_receiver_sock = socket.socket(
-            socket.AF_INET, socket.SOCK_STREAM)
+        self.data_receiver_sock = socket(AF_INET, SOCK_STREAM)
         self.data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
 
         ack = Ack()
