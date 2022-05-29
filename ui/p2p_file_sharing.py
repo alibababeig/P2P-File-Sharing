@@ -1,18 +1,16 @@
 import os
 import random
-import threading  # FIXME:
 import time
 
 from collections import defaultdict
-
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, \
     SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST
-from chunk_manager.file_chunker import FileChunker
+from threading import Thread
 
+from chunk_manager.file_chunker import FileChunker
 from messages.ack import Ack
 from messages.discovery import Discovery
 from messages.offer import Offer
-
 from ui.Cli import Cli
 
 
@@ -31,6 +29,9 @@ ACK_TIMEOUT = 30  # seconds
 
 CHUNK_SIZE = 10000  # Bytes
 
+MIN_PORT = 1024
+MAX_PORT = 65535
+
 
 class P2PFileSharing:
     def __init__(self):
@@ -44,8 +45,8 @@ class P2PFileSharing:
         self.listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         self.listener_sock.bind('', BROADCAST_PORT)
 
-        threading.Thread(target=self.__listen).start()
-        threading.Thread(target=self.__get_ack).start()
+        Thread(target=self.__listen).start()
+        Thread(target=self.__get_ack).start()
 
     def request_file(self, req_filename):
         self.__send_discovery(req_filename)
@@ -179,7 +180,7 @@ class P2PFileSharing:
         offerer, dic = choice
         filename = dic['name']
 
-        port_number = random.randint(1024, 65535)
+        port_number = random.randint(MIN_PORT, MAX_PORT)
         self.data_receiver_sock = socket(AF_INET, SOCK_STREAM)
         self.data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
 
@@ -209,8 +210,8 @@ class P2PFileSharing:
                     ack.set_bytes(buffer[current_client])
                     filename = ack.get_filename()
                     final_addr = (current_client[0], ack.get_port_number())
-                    threading.Thread(target=self.__send_data,
-                                     args=(filename, final_addr)).start()
+                    Thread(target=self.__send_data,
+                           args=(filename, final_addr)).start()
                 except ValueError:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
