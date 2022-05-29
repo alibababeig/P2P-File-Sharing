@@ -171,14 +171,14 @@ class P2PFileSharing:
         offerer, dic = choice
         filename = dic['name']
 
-        port_number = random.randint(1024, 65536)
+        port_number = random.randint(1024, 65535)
         self.data_receiver_sock = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
         self.data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
 
         ack = Ack()
         ack.set_data(filename, port_number)
-        self.listener_sock.sendto(ack.get_bytes(), offerer)
+        self.discovery_sock.sendto(ack.get_bytes(), offerer)
 
     def __is_expired(self, timestamp):
         if timestamp == 0:
