@@ -1,11 +1,14 @@
 import os
+import random
 import socket
 import threading
 from collections import defaultdict
 import time
 
+from messages.ack import Ack
 from messages.discovery import Discovery
 from messages.offer import Offer
+from ui.Cli import Cli
 
 FILENAME_LENGTH_BYTES = 2
 ENDIANNESS = 'little'
@@ -53,7 +56,9 @@ class P2PFileSharing:
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
         offers = self.__get_offers()
-        self.show_offers(offers)
+        Cli.show_offers(offers)
+        choice = Cli.choose_offer()
+        self.__send_ack(choice)
 
         self.discovery_sock.close()
 
@@ -158,8 +163,20 @@ class P2PFileSharing:
 
         return offers
 
+    def __send_ack(self, choice):
+        offerer, dic = choice
+        filename = dic['name']
+
+        port_number = random.randint(1024, 65536)
+        self.data_receiver_sock = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+        self.data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
+
+        ack = Ack()
+        ack.set_data(filename, port_number)
+        self.listener_sock.sendto(ack.get_bytes(), offerer)
+
     def __is_expired(self, timestamp):
         if timestamp == 0:
             return False
-
         return time.time() - timestamp < TRANSMISSION_TIMEOUT
