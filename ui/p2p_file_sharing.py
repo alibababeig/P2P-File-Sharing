@@ -2,6 +2,7 @@ import os
 import socket
 import threading
 from collections import defaultdict
+import time
 
 from messages.discovery import Discovery
 from messages.offer import Offer
@@ -15,9 +16,14 @@ BROADCAST_PORT = 12345
 RX_REPO_PATH = './repository/rx'
 TX_REPO_PATH = './repository/tx'
 
+TRANSMISSION_TIMEOUT = 1  # seconds
+OFFER_TIMEOUT = 5  # seconds
+
 
 class P2PFileSharing:
     def __init__(self):
+        self.discovery_sock = None
+
         self.listener_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.listener_sock.setsockopt(
             socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -34,18 +40,22 @@ class P2PFileSharing:
         threading.Thread(target=self.__listen).start()
 
     def request_file(self, filename):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.discovery_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.discovery_sock.setsockopt(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.discovery_sock.setsockopt(
+            socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
         discovery = Discovery()
         discovery.set_filename(filename)
 
-        sock.sendto(discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
+        self.discovery_sock.sendto(
+            discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
-        # TODO: Get offers
+        offers = self.__get_offers()
+        self.show_offers(offers)
 
-        sock.close()
+        self.discovery_sock.close()
 
     def __listen(self):
         buffer = defaultdict(bytes)
@@ -62,6 +72,7 @@ class P2PFileSharing:
                 try:
                     discovery.set_bytes(buffer[current_client])
                 except Exception:
+                    # TODO: add some timeout mechanism
                     rec_bytes, client = self.listener_sock.recvfrom(
                         FILENAME_LENGTH_BYTES)
                     buffer[client] += rec_bytes
@@ -95,3 +106,51 @@ class P2PFileSharing:
 
         offer = Offer(matching_files=matching_files)
         self.offerer_sock.sendto(offer.get_bytes(), client)
+
+    def __get_offers(self):
+        start_time = time.time()
+
+        offers = {}
+        buffer = defaultdict(bytes)
+        timestamps = defaultdict(int)
+        current_offerer = None
+
+        while time.time() - start_time < OFFER_TIMEOUT:
+            if current_offerer is None:
+                rec_bytes, offerer = self.discovery_sock.recvfrom(
+                    FILENAME_LENGTH_BYTES)
+                if timestamps[offerer] == 0:
+                    timestamps[offerer] = time.time()
+                buffer[offerer] += rec_bytes
+                current_offerer = offerer
+
+            else:
+                offer = Offer()
+                try:
+                    # The following line may raises an exception
+                    offer.set_bytes(buffer[current_offerer])
+                    offers[current_offerer] = offer.get_matching_files()
+                except Exception:
+                    if not self.__is_expired(timestamps[current_offerer]):
+                        rec_bytes, offerer = self.discovery_sock.recvfrom(
+                            FILENAME_LENGTH_BYTES)
+                        if timestamps[offerer] == 0:
+                            timestamps[offerer] = time.time()
+                        buffer[offerer] += rec_bytes
+                        continue
+                finally:
+                    del buffer[current_offerer]
+                    del timestamps[current_offerer]
+
+                    if len(list(buffer.keys())) > 0:
+                        current_offerer = list(buffer.keys())[0]
+                    else:
+                        current_offerer = None
+
+        return offers
+
+    def __is_expired(self, timestamp):
+        if timestamp == 0:
+            return False
+
+        return time.time() - timestamp < TRANSMISSION_TIMEOUT
