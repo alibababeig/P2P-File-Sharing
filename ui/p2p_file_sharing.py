@@ -79,7 +79,7 @@ class P2PFileSharing:
         while True:
             if current_client is None:
                 rec_bytes, client = self.listener_sock.recvfrom(
-                    FILENAME_LENGTH_BYTES)  # FIXME: Should be non-blocking
+                    CHUNK_SIZE)  # FIXME: Should be non-blocking
                 if timestamps[client] == 0:
                     timestamps[client] = time.time()
                 buffer[client] += rec_bytes
@@ -95,7 +95,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.listener_sock.recvfrom(
-                            FILENAME_LENGTH_BYTES)  # FIXME: Should be non-blocking
+                            CHUNK_SIZE)  # FIXME: Should be non-blocking
                         if timestamps[client] == 0:
                             timestamps[client] = time.time()
                         buffer[client] += rec_bytes
@@ -143,7 +143,7 @@ class P2PFileSharing:
         while not self.__is_expired(start_time, OFFER_TIMEOUT):
             if current_offerer is None:
                 rec_bytes, offerer = self.discovery_sock.recvfrom(
-                    FILENAME_LENGTH_BYTES)  # FIXME: Should be non-blocking
+                    CHUNK_SIZE)  # FIXME: Should be non-blocking
                 if timestamps[offerer] == 0:
                     timestamps[offerer] = time.time()
                 buffer[offerer] += rec_bytes
@@ -159,7 +159,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_offerer],
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, offerer = self.discovery_sock.recvfrom(
-                            FILENAME_LENGTH_BYTES)  # FIXME: Should be non-blocking
+                            CHUNK_SIZE)  # FIXME: Should be non-blocking
                         if timestamps[offerer] == 0:
                             timestamps[offerer] = time.time()
                         buffer[offerer] += rec_bytes
