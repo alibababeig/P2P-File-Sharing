@@ -8,8 +8,11 @@ class Ack:
         self.data = None
         self.bytes = None
 
-    def get_data(self):
-        return self.data
+    def get_filename(self):
+        return self.data[0]
+
+    def get_port_number(self):
+        return self.data[1]
 
     def set_data(self, filename, port_number):
         self.data = (filename, port_number)
