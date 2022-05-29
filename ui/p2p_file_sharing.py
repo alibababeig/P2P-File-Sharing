@@ -43,6 +43,17 @@ class P2PFileSharing:
         threading.Thread(target=self.__listen).start()
 
     def request_file(self, filename):
+        self.__send_discovery(filename)
+
+        offers = self.__get_offers()
+        Cli.show_offers(offers)
+
+        choice = Cli.choose_offer(offers)
+        self.__send_ack(choice)
+
+        self.discovery_sock.close()
+
+    def __send_discovery(self, req_filename):
         self.discovery_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.discovery_sock.setsockopt(
             socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -50,17 +61,10 @@ class P2PFileSharing:
             socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
         discovery = Discovery()
-        discovery.set_filename(filename)
+        discovery.set_filename(req_filename)
 
         self.discovery_sock.sendto(
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
-
-        offers = self.__get_offers()
-        Cli.show_offers(offers)
-        choice = Cli.choose_offer()
-        self.__send_ack(choice)
-
-        self.discovery_sock.close()
 
     def __listen(self):
         buffer = defaultdict(bytes)
