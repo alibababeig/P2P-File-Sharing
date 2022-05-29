@@ -3,8 +3,8 @@ import socket
 import threading
 from collections import defaultdict
 
-from packets.discovery import Discovery
-from packets.offer import Offer
+from messages.discovery import Discovery
+from messages.offer import Offer
 
 FILENAME_LENGTH_BYTES = 2
 ENDIANNESS = 'little'
