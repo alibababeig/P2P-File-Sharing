@@ -12,7 +12,7 @@ if __name__ == '__main__':
     while not args.seed_only:
         query = input('enter your query:')
         res = peer.request_file(query)
-        if res == 1:
-            print('successfully done')
-        elif res == 0:
+        if res == 0:
+            print('file successfully transmitted')
+        elif res == -1:
             print('no files transmitted')

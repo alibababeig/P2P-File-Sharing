@@ -12,7 +12,7 @@ class Cli:
 
         valid = False
         while not valid:
-            choice = input(f'Choose one of the above offers [{1}..{offer_cnt}/0 to cancel]: ')
+            choice = input(f'Choose one of the above offers [{1}..{offer_cnt} / 0 to cancel]: ')
             try:
                 choice = int(choice)
                 if choice == 0:
