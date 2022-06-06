@@ -57,6 +57,9 @@ class P2PFileSharing:
         Cli.show_offers(offers)
 
         choice = Cli.choose_offer(offers)
+        if choice == None:
+            return
+
         self.__send_ack(choice)
 
         filename = choice[1]['name']
