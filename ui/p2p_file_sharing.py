@@ -43,7 +43,7 @@ class P2PFileSharing:
         self.listener_sock = socket(AF_INET, SOCK_DGRAM)
         self.listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-        self.listener_sock.bind('', BROADCAST_PORT)
+        self.listener_sock.bind(('', BROADCAST_PORT))
 
         Thread(target=self.__listen).start()
         Thread(target=self.__get_ack).start()
@@ -129,9 +129,11 @@ class P2PFileSharing:
         if len(matching_files) == 0:
             return
 
-        offer = Offer(matching_files=matching_files)
+        # offer = Offer(matching_files=matching_files)
+        offer = Offer()
+        offer.set_matching_files(matching_files)
         self.offerer_sock.sendto(offer.get_bytes(), client)
-        ack = self.__get_ack(client)
+        # ack = self.__get_ack(client)
 
     def __get_offers(self):
         start_time = time.time()
@@ -190,7 +192,7 @@ class P2PFileSharing:
 
         self.discovery_sock.close()
 
-    def __get_ack(self, client):
+    def __get_ack(self):
         buffer = defaultdict(bytes)
         timestamps = defaultdict(int)
         current_client = None
