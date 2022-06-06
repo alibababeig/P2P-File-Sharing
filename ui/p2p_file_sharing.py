@@ -269,9 +269,12 @@ class P2PFileSharing:
             os.path.join(TX_REPO_PATH, filename), CHUNK_SIZE)
 
         chunk = file_chunker.get_next_chunk()
+        bytes_sent = 0
         while chunk != None:
             self.data_sender_sock.send(chunk)
             chunk = file_chunker.get_next_chunk()
+            bytes_sent += CHUNK_SIZE
+            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(), prefix = 'Progress:', suffix = 'Complete', length = 50)
 
         file_chunker.close_file()
         self.data_sender_sock.close()
@@ -289,6 +292,7 @@ class P2PFileSharing:
             buffer = sock.recv(CHUNK_SIZE)  # FIXME: Should be non-blocking
             f.write(buffer)
             written_bytes += len(buffer)
+            Cli.print_progress_bar(written_bytes, filesize, prefix = 'Progress:', suffix = 'Complete', length = 50)
 
         f.close()
         self.data_receiver_sock.close()
