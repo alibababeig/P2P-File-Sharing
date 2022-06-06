@@ -7,6 +7,9 @@ class Cli:
         for _, matching_files in offers.items():
             offer_cnt += len(matching_files)
 
+        if offer_cnt == 0:
+            return None
+
         valid = False
         while not valid:
             choice = input('Choose one of the above offers: ')
