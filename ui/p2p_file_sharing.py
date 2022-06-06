@@ -50,7 +50,7 @@ class P2PFileSharing:
         Thread(target=self.__get_ack).start()
 
     def request_file(self, req_filename):
-        print('LOG: request_file(' + req_filename + ')')
+        Cli.print_log('LOG: request_file(' + req_filename + ')')
         self.__send_discovery(req_filename)
 
         offers = self.__get_offers()
@@ -68,7 +68,7 @@ class P2PFileSharing:
         return 0
 
     def __send_discovery(self, req_filename):
-        print('LOG: __send_discovery(' + req_filename + ')')
+        Cli.print_log('LOG: __send_discovery(' + req_filename + ')')
         self.discovery_sock = socket(AF_INET, SOCK_DGRAM)
         self.discovery_sock.setblocking(0)
         self.discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -81,7 +81,7 @@ class P2PFileSharing:
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
     def __listen(self):
-        print('LOG: __listen()')
+        Cli.print_log('LOG: __listen()')
         buffer = defaultdict(bytes)
         timestamps = defaultdict(int)
         current_client = None
@@ -126,7 +126,7 @@ class P2PFileSharing:
                         current_client = None
 
     def __send_offer(self, req_filename, client):
-        print('LOG: __send_offer(' + req_filename + ',', client, ')')
+        Cli.print_log('LOG: __send_offer(' + req_filename + ', ' + str(client) + ')')
         tx_filenames = [
             filename
             for filename in os.listdir(TX_REPO_PATH)
@@ -152,7 +152,7 @@ class P2PFileSharing:
         # ack = self.__get_ack(client)
 
     def __get_offers(self):
-        print('LOG: __get_offers()')
+        Cli.print_log('LOG: __get_offers()')
 
         start_time = time.time()
 
@@ -203,7 +203,7 @@ class P2PFileSharing:
         return offers
 
     def __send_ack(self, choice):
-        print('LOG: __send_ack(', choice, ')')
+        Cli.print_log('LOG: __send_ack(' + str(choice) + ')')
         offerer, dic = choice
         filename = dic['name']
 
@@ -219,7 +219,7 @@ class P2PFileSharing:
         self.discovery_sock = None
 
     def __get_ack(self):
-        print('LOG: __get_ack()')
+        Cli.print_log('LOG: __get_ack()')
 
         buffer = defaultdict(bytes)
         timestamps = defaultdict(int)
@@ -261,7 +261,7 @@ class P2PFileSharing:
                         current_client = None
 
     def __send_data(self, filename, client):
-        print('LOG: __send_data(' + filename + ',', client, ')')
+        Cli.print_log('LOG: __send_data(' + filename + ', ' + str(client) + ')')
 
         self.data_sender_sock = socket(AF_INET, SOCK_STREAM)
         self.data_sender_sock.connect(client)
@@ -283,7 +283,7 @@ class P2PFileSharing:
 
 
     def __receive_data(self, filename, filesize):
-        print('LOG: __receive_data(' + filename + ', ', filesize, ')')
+        Cli.print_log('LOG: __receive_data(' + filename + ', ' + str(filesize) + ')')
 
         self.data_receiver_sock.listen(1)
         sock, _ = self.data_receiver_sock.accept()

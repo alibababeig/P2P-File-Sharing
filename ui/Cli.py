@@ -1,5 +1,17 @@
+from typing import Literal
+
+from ui.color import Color
+
+
 class Cli:
     offer_row = '{: <7}{: <25}{: <13}{:}'
+
+    @staticmethod
+    def print_log(str, _type:Literal['Debug', 'Info']='Debug'):
+        s = ''
+        if _type == 'Debug':
+            s += Color.WARNING.value
+        print(s + str + Color.ENDC.value)
 
     @staticmethod
     def choose_offer(offers):
@@ -77,7 +89,7 @@ class Cli:
         percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
         filledLength = int(length * iteration // total)
         bar = fill * filledLength + '-' * (length - filledLength)
-        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+        print(f'\r{Color.OKBLUE.value}{prefix} |{bar}| {percent}% {suffix}{Color.ENDC.value}', end = printEnd)
         # Print New Line on Complete
         if iteration == total: 
             print()
