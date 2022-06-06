@@ -273,9 +273,9 @@ class P2PFileSharing:
         bytes_sent = 0
         while chunk != None:
             self.data_sender_sock.send(chunk)
-            chunk = file_chunker.get_next_chunk()
-            bytes_sent += chunk.size()
+            bytes_sent += len(chunk)
             Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(), prefix = 'Progress:', suffix = 'Complete', length = 20)
+            chunk = file_chunker.get_next_chunk()
 
         file_chunker.close_file()
         self.data_sender_sock.close()
