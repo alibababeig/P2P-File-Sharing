@@ -4,13 +4,20 @@ from ui.color import Color
 
 
 class Cli:
-    offer_row = '{: <7}{: <25}{: <13}{:}'
+    offer_row = '{}{: <7}{}{: <25}{: <13}{:}'
 
     @staticmethod
-    def print_log(str, _type:Literal['Debug', 'Info']='Debug'):
+    def print_log(str, _type: Literal['Debug', 'Info', 'Error', 'Success'] = 'Info'):
         s = ''
         if _type == 'Debug':
             s += Color.WARNING.value
+        elif _type == 'Error':
+            s += Color.FAIL.value
+        elif _type == 'Success':
+            s += Color.OKGREEN.value
+        else:
+            s += ''
+        
         print(s + str + Color.ENDC.value)
 
     @staticmethod
@@ -24,7 +31,8 @@ class Cli:
 
         valid = False
         while not valid:
-            choice = input(f'Choose one of the above offers [{1}..{offer_cnt} / 0 to cancel]: ')
+            Cli.print_log(f'Choose one of the above offers [{1}..{offer_cnt} / 0 to cancel]: ')
+            choice = input()
             try:
                 choice = int(choice)
                 if choice == 0:
@@ -33,7 +41,7 @@ class Cli:
                 pass
             valid = choice in range(1, offer_cnt + 1)
             if not valid:
-                print('Invalid choice! Please try again.')
+                Cli.print_log('Invalid choice! Please try again.', 'Error')
 
         for offerer, matching_files in offers.items():
             for dic in matching_files:
@@ -43,8 +51,8 @@ class Cli:
 
     @staticmethod
     def show_offers(offers):
-        print(Cli.offer_row
-              .format('', 'Offerer Address', 'File Size', 'File Name'))
+        print(Color.BOLD.value + Cli.offer_row
+              .format('', '', '', 'Offerer Address', 'File Size', 'File Name') + Color.ENDC.value)
         line = 0
         for offerer, matching_files in offers.items():
             offerer_ip, offerer_port = offerer
@@ -55,7 +63,7 @@ class Cli:
                 line += 1
 
                 print(Cli.offer_row
-                      .format(f'[{line}]', f'{offerer_ip}:{offerer_port}', filesize, filename))
+                      .format(Color.BOLD.value, f'[{line}]', Color.ENDC.value, f'{offerer_ip}:{offerer_port}', filesize, filename))
 
     def __generate_filesize_string(filesize):
         if filesize < 1000:

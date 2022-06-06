@@ -50,7 +50,7 @@ class P2PFileSharing:
         Thread(target=self.__get_ack).start()
 
     def request_file(self, req_filename):
-        Cli.print_log('LOG: request_file(' + req_filename + ')')
+        Cli.print_log('LOG: request_file(' + req_filename + ')', 'Debug')
         self.__send_discovery(req_filename)
 
         offers = self.__get_offers()
@@ -68,7 +68,7 @@ class P2PFileSharing:
         return 0
 
     def __send_discovery(self, req_filename):
-        Cli.print_log('LOG: __send_discovery(' + req_filename + ')')
+        Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
         self.discovery_sock = socket(AF_INET, SOCK_DGRAM)
         self.discovery_sock.setblocking(0)
         self.discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -81,7 +81,7 @@ class P2PFileSharing:
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
     def __listen(self):
-        Cli.print_log('LOG: __listen()')
+        Cli.print_log('LOG: __listen()', 'Debug')
         buffer = defaultdict(bytes)
         timestamps = defaultdict(int)
         current_client = None
@@ -126,7 +126,8 @@ class P2PFileSharing:
                         current_client = None
 
     def __send_offer(self, req_filename, client):
-        Cli.print_log('LOG: __send_offer(' + req_filename + ', ' + str(client) + ')')
+        Cli.print_log('LOG: __send_offer(' + req_filename +
+                      ', ' + str(client) + ')', 'Debug')
         tx_filenames = [
             filename
             for filename in os.listdir(TX_REPO_PATH)
@@ -152,7 +153,7 @@ class P2PFileSharing:
         # ack = self.__get_ack(client)
 
     def __get_offers(self):
-        Cli.print_log('LOG: __get_offers()')
+        Cli.print_log('LOG: __get_offers()', 'Debug')
 
         start_time = time.time()
 
@@ -203,7 +204,7 @@ class P2PFileSharing:
         return offers
 
     def __send_ack(self, choice):
-        Cli.print_log('LOG: __send_ack(' + str(choice) + ')')
+        Cli.print_log('LOG: __send_ack(' + str(choice) + ')', 'Debug')
         offerer, dic = choice
         filename = dic['name']
 
@@ -219,7 +220,7 @@ class P2PFileSharing:
         self.discovery_sock = None
 
     def __get_ack(self):
-        Cli.print_log('LOG: __get_ack()')
+        Cli.print_log('LOG: __get_ack()', 'Debug')
 
         buffer = defaultdict(bytes)
         timestamps = defaultdict(int)
@@ -261,7 +262,8 @@ class P2PFileSharing:
                         current_client = None
 
     def __send_data(self, filename, client):
-        Cli.print_log('LOG: __send_data(' + filename + ', ' + str(client) + ')')
+        Cli.print_log('LOG: __send_data(' + filename +
+                      ', ' + str(client) + ')', 'Debug')
 
         self.data_sender_sock = socket(AF_INET, SOCK_STREAM)
         self.data_sender_sock.connect(client)
@@ -274,16 +276,17 @@ class P2PFileSharing:
         while chunk != None:
             self.data_sender_sock.send(chunk)
             bytes_sent += len(chunk)
-            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(), prefix = 'Progress:', suffix = 'Complete', length = 20)
+            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(
+            ), prefix='Progress:', suffix='Complete', length=20)
             chunk = file_chunker.get_next_chunk()
 
         file_chunker.close_file()
         self.data_sender_sock.close()
         self.data_sender_sock = None
 
-
     def __receive_data(self, filename, filesize):
-        Cli.print_log('LOG: __receive_data(' + filename + ', ' + str(filesize) + ')')
+        Cli.print_log('LOG: __receive_data(' + filename +
+                      ', ' + str(filesize) + ')', 'Debug')
 
         self.data_receiver_sock.listen(1)
         sock, _ = self.data_receiver_sock.accept()
@@ -295,7 +298,8 @@ class P2PFileSharing:
             buffer = sock.recv(CHUNK_SIZE)  # FIXME: Should be non-blocking
             f.write(buffer)
             written_bytes += len(buffer)
-            Cli.print_progress_bar(written_bytes, filesize, prefix = 'Progress:', suffix = 'Complete', length = 20)
+            Cli.print_progress_bar(
+                written_bytes, filesize, prefix='Progress:', suffix='Complete', length=20)
 
         f.close()
         self.data_receiver_sock.close()
@@ -311,8 +315,6 @@ class P2PFileSharing:
             return False
 
         myPort = self.discovery_sock.getsockname()[1]
-        # print(f'my port: {myPort}\nclient: {client}\n')
-
         if client[0] in self.get_host_ip() and client[1] == myPort:
             return True
         else:

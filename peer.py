@@ -1,4 +1,5 @@
 import argparse
+from ui.Cli import Cli
 from ui.p2p_file_sharing import P2PFileSharing
 
 
@@ -10,9 +11,10 @@ if __name__ == '__main__':
     peer = P2PFileSharing()
     
     while not args.seed_only:
-        query = input('enter your query:')
+        Cli.print_log('enter your query:', 'Info')
+        query = input()
         res = peer.request_file(query)
         if res == 0:
-            print('file successfully transmitted')
+            Cli.print_log('file successfully transmitted', 'Success')
         elif res == -1:
-            print('no files transmitted')
+            Cli.print_log('no files transmitted', 'Error')
