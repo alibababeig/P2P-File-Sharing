@@ -6,6 +6,7 @@ from collections import defaultdict
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, \
     SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST
 from threading import Thread
+from netifaces import interfaces, ifaddresses, AF_INET
 
 from chunk_manager.file_chunker import FileChunker
 from messages.ack import Ack
@@ -84,6 +85,9 @@ class P2PFileSharing:
             if current_client is None:
                 rec_bytes, client = self.listener_sock.recvfrom(
                     CHUNK_SIZE)  # FIXME: Should be non-blocking
+                if self.is_myself(client):
+                    continue
+
                 if timestamps[client] == 0:
                     timestamps[client] = time.time()
                 buffer[client] += rec_bytes
@@ -100,6 +104,9 @@ class P2PFileSharing:
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.listener_sock.recvfrom(
                             CHUNK_SIZE)  # FIXME: Should be non-blocking
+                        if self.is_myself(client):
+                            continue
+
                         if timestamps[client] == 0:
                             timestamps[client] = time.time()
                         buffer[client] += rec_bytes
@@ -279,3 +286,21 @@ class P2PFileSharing:
         if timestamp == 0:
             return False
         return time.time() - timestamp < timout
+
+    def is_myself(self, client):
+        myPort = self.discovery_sock.getsockname()[1]
+        print(f'my port: {myPort}\nclient: {client}\n')
+
+        if client[0] in self.get_host_ip() and client[1] == myPort:
+            return True
+        else:
+            return False
+
+    def get_host_ip(self):
+        if_ips = []
+        for ifaceName in interfaces():
+            address = [i['addr'] for i in ifaddresses(
+                ifaceName).setdefault(AF_INET, [{'addr': 'No IP addr'}])]
+            if_ips += address
+
+        return if_ips
