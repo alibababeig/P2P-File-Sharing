@@ -58,13 +58,14 @@ class P2PFileSharing:
 
         choice = Cli.choose_offer(offers)
         if choice == None:
-            return
+            return -1
 
         self.__send_ack(choice)
 
         filename = choice[1]['name']
         filesize = choice[1]['size']
         self.__receive_data(filename, filesize)
+        return 0
 
     def __send_discovery(self, req_filename):
         print('LOG: __send_discovery(' + req_filename + ')')
