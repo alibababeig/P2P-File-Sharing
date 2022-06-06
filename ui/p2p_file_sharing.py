@@ -25,7 +25,7 @@ RX_REPO_PATH = './repository/rx'
 TX_REPO_PATH = './repository/tx'
 
 TRANSMISSION_TIMEOUT = 1  # seconds
-OFFER_TIMEOUT = 5  # seconds
+OFFER_TIMEOUT = 2  # seconds
 ACK_TIMEOUT = 30  # seconds
 
 CHUNK_SIZE = 10000  # Bytes
@@ -69,6 +69,7 @@ class P2PFileSharing:
     def __send_discovery(self, req_filename):
         print('LOG: __send_discovery(' + req_filename + ')')
         self.discovery_sock = socket(AF_INET, SOCK_DGRAM)
+        self.discovery_sock.setblocking(0)
         self.discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
@@ -161,8 +162,11 @@ class P2PFileSharing:
 
         while not self.__is_expired(start_time, OFFER_TIMEOUT):
             if current_offerer is None:
-                rec_bytes, offerer = self.discovery_sock.recvfrom(
-                    CHUNK_SIZE)  # FIXME: Should be non-blocking
+                try:
+                    rec_bytes, offerer = self.discovery_sock.recvfrom(
+                        CHUNK_SIZE)
+                except:
+                    continue
                 if timestamps[offerer] == 0:
                     timestamps[offerer] = time.time()
                 buffer[offerer] += rec_bytes
@@ -177,8 +181,11 @@ class P2PFileSharing:
                 except ValueError:
                     if not self.__is_expired(timestamps[current_offerer],
                                              TRANSMISSION_TIMEOUT):
-                        rec_bytes, offerer = self.discovery_sock.recvfrom(
-                            CHUNK_SIZE)  # FIXME: Should be non-blocking
+                        try:
+                            rec_bytes, offerer = self.discovery_sock.recvfrom(
+                                CHUNK_SIZE)
+                        except:
+                            continue
                         if timestamps[offerer] == 0:
                             timestamps[offerer] = time.time()
                         buffer[offerer] += rec_bytes
@@ -255,7 +262,7 @@ class P2PFileSharing:
         print('LOG: __send_data(' + filename + ',', client, ')')
 
         self.data_sender_sock = socket(AF_INET, SOCK_STREAM)
-        self.connect(client)
+        self.data_sender_sock.connect(client)
 
         file_chunker = FileChunker(
             os.path.join(TX_REPO_PATH, filename), CHUNK_SIZE)
@@ -269,7 +276,7 @@ class P2PFileSharing:
         self.data_sender_sock.close()
 
     def __receive_data(self, filename, filesize):
-        print('LOG: __receive_data(' + filename + ', ' + filesize + ')')
+        print('LOG: __receive_data(' + filename + ', ', filesize, ')')
 
         self.data_receiver_sock.listen(1)
         sock, _ = self.data_receiver_sock.accept()
@@ -285,10 +292,10 @@ class P2PFileSharing:
         f.close()
         self.data_receiver_sock.close()
 
-    def __is_expired(self, timestamp, timout):
+    def __is_expired(self, timestamp, timeout):
         if timestamp == 0:
             return False
-        return time.time() - timestamp < timout
+        return time.time() - timestamp > timeout
 
     def is_myself(self, client):
         if self.discovery_sock == None:
