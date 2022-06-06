@@ -291,8 +291,11 @@ class P2PFileSharing:
         return time.time() - timestamp < timout
 
     def is_myself(self, client):
+        if self.discovery_sock == None:
+            return False
+
         myPort = self.discovery_sock.getsockname()[1]
-        print(f'my port: {myPort}\nclient: {client}\n')
+        # print(f'my port: {myPort}\nclient: {client}\n')
 
         if client[0] in self.get_host_ip() and client[1] == myPort:
             return True
