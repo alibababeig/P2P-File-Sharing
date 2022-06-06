@@ -216,6 +216,7 @@ class P2PFileSharing:
         self.discovery_sock.sendto(ack.get_bytes(), offerer)
 
         self.discovery_sock.close()
+        self.discovery_sock = None
 
     def __get_ack(self):
         print('LOG: __get_ack()')
@@ -274,10 +275,12 @@ class P2PFileSharing:
             self.data_sender_sock.send(chunk)
             chunk = file_chunker.get_next_chunk()
             bytes_sent += CHUNK_SIZE
-            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(), prefix = 'Progress:', suffix = 'Complete', length = 30)
+            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(), prefix = 'Progress:', suffix = 'Complete', length = 20)
 
         file_chunker.close_file()
         self.data_sender_sock.close()
+        self.data_sender_sock = None
+
 
     def __receive_data(self, filename, filesize):
         print('LOG: __receive_data(' + filename + ', ', filesize, ')')
@@ -292,10 +295,11 @@ class P2PFileSharing:
             buffer = sock.recv(CHUNK_SIZE)  # FIXME: Should be non-blocking
             f.write(buffer)
             written_bytes += len(buffer)
-            Cli.print_progress_bar(written_bytes, filesize, prefix = 'Progress:', suffix = 'Complete', length = 30)
+            Cli.print_progress_bar(written_bytes, filesize, prefix = 'Progress:', suffix = 'Complete', length = 20)
 
         f.close()
         self.data_receiver_sock.close()
+        self.data_receiver_sock = None
 
     def __is_expired(self, timestamp, timeout):
         if timestamp == 0:
