@@ -289,6 +289,8 @@ class P2PFileSharing:
         file_chunker = FileChunker(
             os.path.join(TX_REPO_PATH, filename), self.chunk_size)
 
+        filesize = file_chunker.get_file_size()
+
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
         start_time = time.time()
@@ -299,9 +301,7 @@ class P2PFileSharing:
                 bytes_sent += len(chunk)
                 upload_speed = self.__calc_speed(bytes_sent, start_time)
 
-                Cli.print_progress_bar(
-                    bytes_sent, file_chunker.get_file_size(), upload_speed,
-                    prefix='Progress:', suffix='Complete', length=20)
+                Cli.print_progress_bar(bytes_sent, filesize, upload_speed)
                 chunk = file_chunker.get_next_chunk()
             except:
                 Cli.print_log('\ntransmission interrupted', 'Error')
@@ -347,9 +347,7 @@ class P2PFileSharing:
             written_bytes += len(buffer)
             download_speed = self.__calc_speed(written_bytes, start_time)
 
-            Cli.print_progress_bar(
-                written_bytes, filesize, download_speed,
-                prefix='Progress:', suffix='Complete', length=20)
+            Cli.print_progress_bar(written_bytes, filesize, download_speed)
 
         f.close()
         self.__data_receiver_sock.close()

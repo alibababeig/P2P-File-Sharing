@@ -82,7 +82,9 @@ class Cli:
         return 'TOO BIG!'
 
     @staticmethod
-    def print_progress_bar(iteration, total, speed, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
+    def print_progress_bar(iteration, total, speed, prefix='Progress:',
+                           suffix='Completed', decimals=1, length=20, fill='█',
+                           printEnd="\r"):
         """
         Call in a loop to create terminal progress bar
         @params:
