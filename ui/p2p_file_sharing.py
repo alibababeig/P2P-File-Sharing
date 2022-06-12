@@ -27,7 +27,6 @@ TX_REPO_PATH = './repository/tx'
 
 TRANSMISSION_TIMEOUT = 1  # seconds
 OFFER_TIMEOUT = 2  # seconds
-ACK_TIMEOUT = 30  # seconds
 DATA_TRANSFER_TIMEOUT = 5  # seconds
 
 CHUNK_SIZE = 10000  # Bytes
@@ -97,7 +96,7 @@ class P2PFileSharing:
         while True:
             if current_client is None:
                 rec_bytes, client = self.__listener_sock.recvfrom(
-                    CHUNK_SIZE)  # FIXME: Should be non-blocking
+                    CHUNK_SIZE)
                 if self.__is_myself(client):
                     continue
 
@@ -116,7 +115,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.__listener_sock.recvfrom(
-                            CHUNK_SIZE)  # FIXME: Should be non-blocking
+                            CHUNK_SIZE)
                         if self.__is_myself(client):
                             continue
 
@@ -215,10 +214,14 @@ class P2PFileSharing:
         Cli.print_log('LOG: __send_ack(' + str(choice) + ')', 'Debug')
         offerer, dic = choice
         filename = dic['name']
-
-        port_number = random.randint(MIN_PORT, MAX_PORT)
-        self.__data_receiver_sock = socket(AF_INET, SOCK_STREAM)
-        self.__data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
+        while True:
+            try:
+                port_number = random.randint(MIN_PORT, MAX_PORT)
+                self.__data_receiver_sock = socket(AF_INET, SOCK_STREAM)
+                self.__data_receiver_sock.bind(('', port_number))
+                break
+            except OSError:
+                pass
 
         ack = Ack()
         ack.set_data(filename, port_number)
