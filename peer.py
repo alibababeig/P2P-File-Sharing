@@ -22,3 +22,5 @@ if __name__ == '__main__':
             Cli.print_log('no files transmitted', 'Error')
         elif res == Status.NO_OFFERS:
             Cli.print_log('no offers received', 'Error')
+        elif res == Status.TRANSFER_INTERRUPTED:
+            Cli.print_log('transmission interrupted', 'Error')

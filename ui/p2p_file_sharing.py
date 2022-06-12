@@ -28,6 +28,7 @@ TX_REPO_PATH = './repository/tx'
 TRANSMISSION_TIMEOUT = 1  # seconds
 OFFER_TIMEOUT = 2  # seconds
 ACK_TIMEOUT = 30  # seconds
+DATA_TRANSFER_TIMEOUT = 5  # seconds
 
 CHUNK_SIZE = 10000  # Bytes
 
@@ -68,9 +69,9 @@ class P2PFileSharing:
 
         filename = choice[1]['name']
         filesize = choice[1]['size']
-        self.__receive_data(filename, filesize)
+        status = self.__receive_data(filename, filesize)
 
-        return Status.SUCCESS
+        return status
 
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
@@ -298,10 +299,19 @@ class P2PFileSharing:
 
         f = open(os.path.join(RX_REPO_PATH, filename), 'wb')
         written_bytes = 0
+        status = Status.SUCCESS
+        start_time = time.time()
 
         while written_bytes < filesize:
-            buffer = sock.recv(CHUNK_SIZE)  # FIXME: Should be non-blocking
-            print('\n.')
+            buffer = sock.recv(CHUNK_SIZE)
+            if len(buffer) > 0:
+                start_time = time.time()
+
+            if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):
+                status = Status.TRANSFER_INTERRUPTED
+                Cli.print_log('')
+                break
+
             f.write(buffer)
             written_bytes += len(buffer)
             Cli.print_progress_bar(
@@ -310,6 +320,8 @@ class P2PFileSharing:
         f.close()
         self.data_receiver_sock.close()
         self.data_receiver_sock = None
+
+        return status
 
     def __is_expired(self, timestamp, timeout):
         if timestamp == 0:
