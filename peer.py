@@ -13,9 +13,7 @@ if __name__ == '__main__':
     peer = P2PFileSharing()
 
     while not args.seed_only:
-        Cli.print_log('enter your query:', 'Info')
-        query = input()
-        res = peer.request_file(query)
+        res = peer.request_file()
         if res == Status.SUCCESS:
             Cli.print_log('file successfully transmitted', 'Success')
         elif res == Status.NO_CHOICE:

@@ -50,7 +50,9 @@ class P2PFileSharing:
         Thread(target=self.__listen).start()
         Thread(target=self.__get_ack).start()
 
-    def request_file(self, req_filename):
+    def request_file(self):
+        Cli.print_log('enter your query:', 'Info')
+        req_filename = input()
         Cli.print_log('LOG: request_file(' + req_filename + ')', 'Debug')
         self.__send_discovery(req_filename)
 
