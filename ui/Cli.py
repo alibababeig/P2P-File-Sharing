@@ -103,7 +103,7 @@ class Cli:
         bar = fill * filledLength + '-' * (length - filledLength)
 
         print(
-            f'\r{"".join(map(str, [" " for i in range(53)]))}', end=printEnd)
+            f'\r{"".join(map(str, [" " for i in range(55)]))}', end=printEnd)
 
         if iteration < total:
             print(
