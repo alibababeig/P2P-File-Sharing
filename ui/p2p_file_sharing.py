@@ -29,14 +29,14 @@ TRANSMISSION_TIMEOUT = 1  # seconds
 OFFER_TIMEOUT = 2  # seconds
 DATA_TRANSFER_TIMEOUT = 5  # seconds
 
-CHUNK_SIZE = 10000  # Bytes
-
 MIN_PORT = 1024
 MAX_PORT = 65535
 
 
 class P2PFileSharing:
-    def __init__(self):
+    def __init__(self, chunck_size=10000):
+        self.chunk_size = chunck_size  # Bytes
+
         self.__discovery_sock = None
         self.__offerer_sock = socket(AF_INET, SOCK_DGRAM)
         self.__data_receiver_sock = None
@@ -96,7 +96,7 @@ class P2PFileSharing:
         while True:
             if current_client is None:
                 rec_bytes, client = self.__listener_sock.recvfrom(
-                    CHUNK_SIZE)
+                    self.chunk_size)
                 if self.__is_myself(client):
                     continue
 
@@ -115,7 +115,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.__listener_sock.recvfrom(
-                            CHUNK_SIZE)
+                            self.chunk_size)
                         if self.__is_myself(client):
                             continue
 
@@ -173,7 +173,7 @@ class P2PFileSharing:
             if current_offerer is None:
                 try:
                     rec_bytes, offerer = self.__discovery_sock.recvfrom(
-                        CHUNK_SIZE)
+                        self.chunk_size)
                 except:
                     continue
                 if timestamps[offerer] == 0:
@@ -192,7 +192,7 @@ class P2PFileSharing:
                                              TRANSMISSION_TIMEOUT):
                         try:
                             rec_bytes, offerer = self.__discovery_sock.recvfrom(
-                                CHUNK_SIZE)
+                                self.chunk_size)
                         except:
                             continue
                         if timestamps[offerer] == 0:
@@ -239,7 +239,7 @@ class P2PFileSharing:
 
         while True:
             if current_client is None:
-                rec_bytes, client = self.__offerer_sock.recvfrom(CHUNK_SIZE)
+                rec_bytes, client = self.__offerer_sock.recvfrom(self.chunk_size)
                 if timestamps[client] == 0:
                     timestamps[client] = time.time()
                 buffer[client] += rec_bytes
@@ -258,7 +258,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.__offerer_sock.recvfrom(
-                            CHUNK_SIZE)
+                            self.chunk_size)
                         if timestamps[client] == 0:
                             timestamps[client] = time.time()
                         buffer[client] += rec_bytes
@@ -282,7 +282,7 @@ class P2PFileSharing:
         data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
         file_chunker = FileChunker(
-            os.path.join(TX_REPO_PATH, filename), CHUNK_SIZE)
+            os.path.join(TX_REPO_PATH, filename), self.chunk_size)
 
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
@@ -322,7 +322,7 @@ class P2PFileSharing:
 
         while written_bytes < filesize:
             try:
-                buffer = sock.recv(CHUNK_SIZE)
+                buffer = sock.recv(self.chunk_size)
                 if len(buffer) > 0:
                     start_time = time.time()
                 if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):

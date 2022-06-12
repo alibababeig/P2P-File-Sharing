@@ -1,4 +1,5 @@
 import argparse
+import chunk
 from ui.Cli import Cli
 from ui.p2p_file_sharing import P2PFileSharing
 from status.status import Status
@@ -6,11 +7,19 @@ from status.status import Status
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed-only', dest='seed_only',
-                        help='co', action='store_true', default=False)
+    parser.add_argument('--seed-only', '-so', dest='seed_only',
+                        help='enable this flag if you don\'t want to download any files',
+                        action='store_true', default=False)
+    parser.add_argument('--chunk-size', '-cs', dest='chunk_size',
+                        help='set a custom value for chunk size', default='10000')
     args = parser.parse_args()
+    try:
+        chunk_size = int(args.chunk_size)
+    except:
+        Cli.print_log('bad input type', 'Error')
+        exit()
 
-    peer = P2PFileSharing()
+    peer = P2PFileSharing(chunck_size=chunk_size)
 
     while not args.seed_only:
         res = peer.request_file()
