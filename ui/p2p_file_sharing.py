@@ -3,10 +3,11 @@ import random
 import time
 
 from collections import defaultdict
+from difflib import SequenceMatcher
+from netifaces import interfaces, ifaddresses, AF_INET
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, \
     SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST, timeout
 from threading import Thread
-from netifaces import interfaces, ifaddresses, AF_INET
 
 from chunk_manager.file_chunker import FileChunker
 from messages.ack import Ack
@@ -14,7 +15,6 @@ from messages.discovery import Discovery
 from messages.offer import Offer
 from ui.Cli import Cli
 from status.status import Status
-
 
 FILENAME_LENGTH_BYTES = 2
 ENDIANNESS = 'little'
@@ -31,6 +31,8 @@ DATA_TRANSFER_TIMEOUT = 5  # seconds
 
 MIN_PORT = 1024
 MAX_PORT = 65535
+
+SIMILARITY_THRESHOLD = 0.5
 
 
 class P2PFileSharing:
@@ -147,7 +149,7 @@ class P2PFileSharing:
                 'size': os.path.getsize(os.path.join(TX_REPO_PATH, filename))
             }
             for filename in tx_filenames
-            if req_filename in filename
+            if SequenceMatcher(None, req_filename.lower(), filename.lower()).ratio() > SIMILARITY_THRESHOLD
         ]
 
         if len(matching_files) == 0:
@@ -239,7 +241,8 @@ class P2PFileSharing:
 
         while True:
             if current_client is None:
-                rec_bytes, client = self.__offerer_sock.recvfrom(self.chunk_size)
+                rec_bytes, client = self.__offerer_sock.recvfrom(
+                    self.chunk_size)
                 if timestamps[client] == 0:
                     timestamps[client] = time.time()
                 buffer[client] += rec_bytes
@@ -326,12 +329,11 @@ class P2PFileSharing:
                 if len(buffer) > 0:
                     start_time = time.time()
                 if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):
-                   raise timeout
+                    raise timeout
             except timeout:
                 status = Status.TRANSFER_INTERRUPTED
                 Cli.print_log('')
                 break
-
 
             f.write(buffer)
             written_bytes += len(buffer)
