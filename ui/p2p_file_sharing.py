@@ -38,15 +38,15 @@ MAX_PORT = 65535
 
 class P2PFileSharing:
     def __init__(self):
-        self.discovery_sock = None
-        self.offerer_sock = socket(AF_INET, SOCK_DGRAM)
-        self.data_receiver_sock = None
-        # self.data_sender_sock = None  # TODO
+        self.__discovery_sock = None
+        self.__offerer_sock = socket(AF_INET, SOCK_DGRAM)
+        self.__data_receiver_sock = None
+        # self.data_sender_sock = None
 
-        self.listener_sock = socket(AF_INET, SOCK_DGRAM)
-        self.listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-        self.listener_sock.bind(('', BROADCAST_PORT))
+        self.__listener_sock = socket(AF_INET, SOCK_DGRAM)
+        self.__listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.__listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        self.__listener_sock.bind(('', BROADCAST_PORT))
 
         Thread(target=self.__listen).start()
         Thread(target=self.__get_ack).start()
@@ -77,15 +77,15 @@ class P2PFileSharing:
 
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
-        self.discovery_sock = socket(AF_INET, SOCK_DGRAM)
-        self.discovery_sock.setblocking(0)
-        self.discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        self.__discovery_sock = socket(AF_INET, SOCK_DGRAM)
+        self.__discovery_sock.setblocking(0)
+        self.__discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        self.__discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
         discovery = Discovery()
         discovery.set_filename(req_filename)
 
-        self.discovery_sock.sendto(
+        self.__discovery_sock.sendto(
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
     def __listen(self):
@@ -96,7 +96,7 @@ class P2PFileSharing:
 
         while True:
             if current_client is None:
-                rec_bytes, client = self.listener_sock.recvfrom(
+                rec_bytes, client = self.__listener_sock.recvfrom(
                     CHUNK_SIZE)  # FIXME: Should be non-blocking
                 if self.__is_myself(client):
                     continue
@@ -115,7 +115,7 @@ class P2PFileSharing:
                 except ValueError:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
-                        rec_bytes, client = self.listener_sock.recvfrom(
+                        rec_bytes, client = self.__listener_sock.recvfrom(
                             CHUNK_SIZE)  # FIXME: Should be non-blocking
                         if self.__is_myself(client):
                             continue
@@ -157,7 +157,7 @@ class P2PFileSharing:
         # offer = Offer(matching_files=matching_files)
         offer = Offer()
         offer.set_matching_files(matching_files)
-        self.offerer_sock.sendto(offer.get_bytes(), client)
+        self.__offerer_sock.sendto(offer.get_bytes(), client)
         # ack = self.__get_ack(client)
 
     def __get_offers(self):
@@ -173,7 +173,7 @@ class P2PFileSharing:
         while not self.__is_expired(start_time, OFFER_TIMEOUT):
             if current_offerer is None:
                 try:
-                    rec_bytes, offerer = self.discovery_sock.recvfrom(
+                    rec_bytes, offerer = self.__discovery_sock.recvfrom(
                         CHUNK_SIZE)
                 except:
                     continue
@@ -192,7 +192,7 @@ class P2PFileSharing:
                     if not self.__is_expired(timestamps[current_offerer],
                                              TRANSMISSION_TIMEOUT):
                         try:
-                            rec_bytes, offerer = self.discovery_sock.recvfrom(
+                            rec_bytes, offerer = self.__discovery_sock.recvfrom(
                                 CHUNK_SIZE)
                         except:
                             continue
@@ -217,15 +217,15 @@ class P2PFileSharing:
         filename = dic['name']
 
         port_number = random.randint(MIN_PORT, MAX_PORT)
-        self.data_receiver_sock = socket(AF_INET, SOCK_STREAM)
-        self.data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
+        self.__data_receiver_sock = socket(AF_INET, SOCK_STREAM)
+        self.__data_receiver_sock.bind(('', port_number))  # TODO: Handle failure
 
         ack = Ack()
         ack.set_data(filename, port_number)
-        self.discovery_sock.sendto(ack.get_bytes(), offerer)
+        self.__discovery_sock.sendto(ack.get_bytes(), offerer)
 
-        self.discovery_sock.close()
-        self.discovery_sock = None
+        self.__discovery_sock.close()
+        self.__discovery_sock = None
 
     def __get_ack(self):
         Cli.print_log('LOG: __get_ack()', 'Debug')
@@ -236,7 +236,7 @@ class P2PFileSharing:
 
         while True:
             if current_client is None:
-                rec_bytes, client = self.offerer_sock.recvfrom(CHUNK_SIZE)
+                rec_bytes, client = self.__offerer_sock.recvfrom(CHUNK_SIZE)
                 if timestamps[client] == 0:
                     timestamps[client] = time.time()
                 buffer[client] += rec_bytes
@@ -254,7 +254,7 @@ class P2PFileSharing:
                 except ValueError:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
-                        rec_bytes, client = self.offerer_sock.recvfrom(
+                        rec_bytes, client = self.__offerer_sock.recvfrom(
                             CHUNK_SIZE)
                         if timestamps[client] == 0:
                             timestamps[client] = time.time()
@@ -302,11 +302,11 @@ class P2PFileSharing:
         Cli.print_log('LOG: __receive_data(' + filename +
                       ', ' + str(filesize) + ')', 'Debug')
 
-        self.data_receiver_sock.listen(1)
-        self.data_receiver_sock.setblocking(0)
-        self.data_receiver_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+        self.__data_receiver_sock.listen(1)
+        self.__data_receiver_sock.setblocking(0)
+        self.__data_receiver_sock.settimeout(DATA_TRANSFER_TIMEOUT)
         try:
-            sock, _ = self.data_receiver_sock.accept()
+            sock, _ = self.__data_receiver_sock.accept()
         except:
             return Status.TRANSFER_INTERRUPTED
         sock.setblocking(0)
@@ -336,8 +336,8 @@ class P2PFileSharing:
                 written_bytes, filesize, prefix='Progress:', suffix='Complete', length=20)
 
         f.close()
-        self.data_receiver_sock.close()
-        self.data_receiver_sock = None
+        self.__data_receiver_sock.close()
+        self.__data_receiver_sock = None
 
         return status
 
@@ -347,10 +347,10 @@ class P2PFileSharing:
         return time.time() - timestamp > timeout
 
     def __is_myself(self, client):
-        if self.discovery_sock == None:
+        if self.__discovery_sock == None:
             return False
 
-        myPort = self.discovery_sock.getsockname()[1]
+        myPort = self.__discovery_sock.getsockname()[1]
         if client[0] in self.__get_host_ip() and client[1] == myPort:
             return True
         else:
