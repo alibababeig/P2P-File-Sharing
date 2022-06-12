@@ -4,7 +4,7 @@ import time
 
 from collections import defaultdict
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, \
-    SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST
+    SOL_SOCKET, SO_REUSEADDR, SO_BROADCAST, timeout
 from threading import Thread
 from netifaces import interfaces, ifaddresses, AF_INET
 
@@ -298,6 +298,8 @@ class P2PFileSharing:
 
         self.data_receiver_sock.listen(1)
         sock, _ = self.data_receiver_sock.accept()
+        sock.setblocking(0)
+        sock.settimeout(5)
 
         f = open(os.path.join(RX_REPO_PATH, filename), 'wb')
         written_bytes = 0
@@ -305,14 +307,17 @@ class P2PFileSharing:
         start_time = time.time()
 
         while written_bytes < filesize:
-            buffer = sock.recv(CHUNK_SIZE)
-            if len(buffer) > 0:
-                start_time = time.time()
-
-            if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):
+            try:
+                buffer = sock.recv(CHUNK_SIZE)
+                if len(buffer) > 0:
+                    start_time = time.time()
+                if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):
+                   raise timeout
+            except timeout:
                 status = Status.TRANSFER_INTERRUPTED
                 Cli.print_log('')
                 break
+
 
             f.write(buffer)
             written_bytes += len(buffer)
