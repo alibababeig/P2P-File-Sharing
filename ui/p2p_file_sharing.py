@@ -13,6 +13,7 @@ from messages.ack import Ack
 from messages.discovery import Discovery
 from messages.offer import Offer
 from ui.Cli import Cli
+from status.status import Status
 
 
 FILENAME_LENGTH_BYTES = 2
@@ -56,16 +57,20 @@ class P2PFileSharing:
         offers = self.__get_offers()
         Cli.show_offers(offers)
 
+        if len(offers) == 0:
+            return Status.NO_OFFERS
+
         choice = Cli.choose_offer(offers)
         if choice == None:
-            return -1
+            return Status.NO_CHOICE
 
         self.__send_ack(choice)
 
         filename = choice[1]['name']
         filesize = choice[1]['size']
         self.__receive_data(filename, filesize)
-        return 0
+
+        return Status.SUCCESS
 
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
@@ -296,6 +301,7 @@ class P2PFileSharing:
 
         while written_bytes < filesize:
             buffer = sock.recv(CHUNK_SIZE)  # FIXME: Should be non-blocking
+            print('\n.')
             f.write(buffer)
             written_bytes += len(buffer)
             Cli.print_progress_bar(
