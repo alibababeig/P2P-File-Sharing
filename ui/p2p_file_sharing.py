@@ -41,7 +41,7 @@ class P2PFileSharing:
         self.discovery_sock = None
         self.offerer_sock = socket(AF_INET, SOCK_DGRAM)
         self.data_receiver_sock = None
-        self.data_sender_sock = None  # TODO
+        # self.data_sender_sock = None  # TODO
 
         self.listener_sock = socket(AF_INET, SOCK_DGRAM)
         self.listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -98,7 +98,7 @@ class P2PFileSharing:
             if current_client is None:
                 rec_bytes, client = self.listener_sock.recvfrom(
                     CHUNK_SIZE)  # FIXME: Should be non-blocking
-                if self.is_myself(client):
+                if self.__is_myself(client):
                     continue
 
                 if timestamps[client] == 0:
@@ -117,7 +117,7 @@ class P2PFileSharing:
                                              TRANSMISSION_TIMEOUT):
                         rec_bytes, client = self.listener_sock.recvfrom(
                             CHUNK_SIZE)  # FIXME: Should be non-blocking
-                        if self.is_myself(client):
+                        if self.__is_myself(client):
                             continue
 
                         if timestamps[client] == 0:
@@ -273,10 +273,10 @@ class P2PFileSharing:
         Cli.print_log('LOG: __send_data(' + filename +
                       ', ' + str(client) + ')', 'Debug')
 
-        self.data_sender_sock = socket(AF_INET, SOCK_STREAM)
-        self.data_sender_sock.connect(client)
-        self.data_sender_sock.setblocking(0)
-        self.data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+        data_sender_sock = socket(AF_INET, SOCK_STREAM)
+        data_sender_sock.connect(client)
+        data_sender_sock.setblocking(0)
+        data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
         file_chunker = FileChunker(
             os.path.join(TX_REPO_PATH, filename), CHUNK_SIZE)
@@ -285,7 +285,7 @@ class P2PFileSharing:
         bytes_sent = 0
         while chunk != None:
             try:
-                self.data_sender_sock.send(chunk)
+                data_sender_sock.send(chunk)
                 bytes_sent += len(chunk)
                 Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(
                 ), prefix='Progress:', suffix='Complete', length=20)
@@ -295,8 +295,8 @@ class P2PFileSharing:
                 break
 
         file_chunker.close_file()
-        self.data_sender_sock.close()
-        self.data_sender_sock = None
+        data_sender_sock.close()
+        data_sender_sock = None
 
     def __receive_data(self, filename, filesize):
         Cli.print_log('LOG: __receive_data(' + filename +
@@ -346,17 +346,17 @@ class P2PFileSharing:
             return False
         return time.time() - timestamp > timeout
 
-    def is_myself(self, client):
+    def __is_myself(self, client):
         if self.discovery_sock == None:
             return False
 
         myPort = self.discovery_sock.getsockname()[1]
-        if client[0] in self.get_host_ip() and client[1] == myPort:
+        if client[0] in self.__get_host_ip() and client[1] == myPort:
             return True
         else:
             return False
 
-    def get_host_ip(self):
+    def __get_host_ip(self):
         if_ips = []
         for ifaceName in interfaces():
             address = [i['addr'] for i in ifaddresses(
