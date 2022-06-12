@@ -275,6 +275,8 @@ class P2PFileSharing:
 
         self.data_sender_sock = socket(AF_INET, SOCK_STREAM)
         self.data_sender_sock.connect(client)
+        self.data_sender_sock.setblocking(0)
+        self.data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
         file_chunker = FileChunker(
             os.path.join(TX_REPO_PATH, filename), CHUNK_SIZE)
@@ -282,11 +284,15 @@ class P2PFileSharing:
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
         while chunk != None:
-            self.data_sender_sock.send(chunk)
-            bytes_sent += len(chunk)
-            Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(
-            ), prefix='Progress:', suffix='Complete', length=20)
-            chunk = file_chunker.get_next_chunk()
+            try:
+                self.data_sender_sock.send(chunk)
+                bytes_sent += len(chunk)
+                Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(
+                ), prefix='Progress:', suffix='Complete', length=20)
+                chunk = file_chunker.get_next_chunk()
+            except:
+                Cli.print_log('\ntransmission interrupted', 'Error')
+                break
 
         file_chunker.close_file()
         self.data_sender_sock.close()
@@ -299,7 +305,7 @@ class P2PFileSharing:
         self.data_receiver_sock.listen(1)
         sock, _ = self.data_receiver_sock.accept()
         sock.setblocking(0)
-        sock.settimeout(5)
+        sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
         f = open(os.path.join(RX_REPO_PATH, filename), 'wb')
         written_bytes = 0
