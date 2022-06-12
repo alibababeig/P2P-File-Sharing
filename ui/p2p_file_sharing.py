@@ -149,7 +149,9 @@ class P2PFileSharing:
                 'size': os.path.getsize(os.path.join(TX_REPO_PATH, filename))
             }
             for filename in tx_filenames
-            if SequenceMatcher(None, req_filename.lower(), filename.lower()).ratio() > SIMILARITY_THRESHOLD
+            if req_filename.lower() in filename.lower() or
+            SequenceMatcher(None, req_filename.lower(),
+                            filename.lower()).ratio() > SIMILARITY_THRESHOLD
         ]
 
         if len(matching_files) == 0:
