@@ -17,7 +17,7 @@ class Cli:
             s += Color.OKGREEN.value
         else:
             s += ''
-        
+
         print(s + str + Color.ENDC.value)
 
     @staticmethod
@@ -31,7 +31,8 @@ class Cli:
 
         valid = False
         while not valid:
-            Cli.print_log(f'Choose one of the above offers [{1}..{offer_cnt} / 0 to cancel]: ')
+            Cli.print_log(
+                f'Choose one of the above offers [{1}..{offer_cnt} / 0 to cancel]: ')
             choice = input()
             try:
                 choice = int(choice)
@@ -81,7 +82,7 @@ class Cli:
         return 'TOO BIG!'
 
     @staticmethod
-    def print_progress_bar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    def print_progress_bar(iteration, total, speed, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
         """
         Call in a loop to create terminal progress bar
         @params:
@@ -94,10 +95,18 @@ class Cli:
             fill        - Optional  : bar fill character (Str)
             printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
         """
-        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        percent = ("{0:." + str(decimals) + "f}").format(100 *
+                                                         (iteration / float(total)))
         filledLength = int(length * iteration // total)
         bar = fill * filledLength + '-' * (length - filledLength)
-        print(f'\r{Color.OKBLUE.value}{prefix} |{bar}| {percent}% {suffix}{Color.ENDC.value}', end = printEnd)
-        # Print New Line on Complete
-        if iteration == total: 
+
+        print(
+            f'\r{"".join(map(str, [" " for i in range(53)]))}', end=printEnd)
+
+        if iteration < total:
+            print(
+                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {percent}%  {Color.ENDC.value}{Color.OKGREEN.value}{speed}{Color.ENDC.value}', end=printEnd)
+        else:
+            print(
+                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {suffix}{Color.ENDC.value}', end=printEnd)
             print()

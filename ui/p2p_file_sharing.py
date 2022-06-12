@@ -289,12 +289,17 @@ class P2PFileSharing:
 
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
+        start_time = time.time()
+
         while chunk != None:
             try:
                 data_sender_sock.send(chunk)
                 bytes_sent += len(chunk)
-                Cli.print_progress_bar(bytes_sent, file_chunker.get_file_size(
-                ), prefix='Progress:', suffix='Complete', length=20)
+                upload_speed = self.__calc_speed(bytes_sent, start_time)
+
+                Cli.print_progress_bar(
+                    bytes_sent, file_chunker.get_file_size(), upload_speed,
+                    prefix='Progress:', suffix='Complete', length=20)
                 chunk = file_chunker.get_next_chunk()
             except:
                 Cli.print_log('\ntransmission interrupted', 'Error')
@@ -322,13 +327,14 @@ class P2PFileSharing:
         written_bytes = 0
         status = Status.SUCCESS
         start_time = time.time()
+        timer_start_time = start_time
 
         while written_bytes < filesize:
             try:
                 buffer = sock.recv(self.chunk_size)
                 if len(buffer) > 0:
-                    start_time = time.time()
-                if self.__is_expired(start_time, DATA_TRANSFER_TIMEOUT):
+                    timer_start_time = time.time()
+                if self.__is_expired(timer_start_time, DATA_TRANSFER_TIMEOUT):
                     raise timeout
             except timeout:
                 status = Status.TRANSFER_INTERRUPTED
@@ -337,14 +343,35 @@ class P2PFileSharing:
 
             f.write(buffer)
             written_bytes += len(buffer)
+            download_speed = self.__calc_speed(written_bytes, start_time)
+
             Cli.print_progress_bar(
-                written_bytes, filesize, prefix='Progress:', suffix='Complete', length=20)
+                written_bytes, filesize, download_speed,
+                prefix='Progress:', suffix='Complete', length=20)
 
         f.close()
         self.__data_receiver_sock.close()
         self.__data_receiver_sock = None
 
         return status
+
+    def __calc_speed(self, bytes_cnt, start_time):
+        current_time = time.time()
+        speed = bytes_cnt / (current_time - start_time)
+
+        if speed < 1000:
+            return f'{speed} B/s'
+
+        if speed < 1000 ** 2:
+            return f'{speed / 1000:.2f} KB/s'
+
+        if speed < 1000 ** 3:
+            return f'{speed / (1000 ** 2):.2f} MB/s'
+
+        if speed < 1000 ** 4:
+            return f'{speed / (1000 ** 3):.2f} GB/s'
+
+        return 'TOO FAST!'
 
     def __is_expired(self, timestamp, timeout):
         if timestamp == 0:
