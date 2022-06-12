@@ -107,8 +107,8 @@ class Cli:
 
         if iteration < total:
             print(
-                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {percent}%  {Color.ENDC.value}{Color.OKGREEN.value}{speed}{Color.ENDC.value}', end=printEnd)
+                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {percent}%{Color.ENDC.value}  {Color.OKGREEN.value}{speed}{Color.ENDC.value}', end=printEnd)
         else:
             print(
-                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {suffix}{Color.ENDC.value}', end=printEnd)
+                f'\r{Color.OKBLUE.value}{prefix} |{bar}| {suffix}{Color.ENDC.value} {Color.OKGREEN.value}{speed}{Color.ENDC.value}', end=printEnd)
             print()
