@@ -1,7 +1,6 @@
 import argparse
-import chunk
 from ui.Cli import Cli
-from ui.p2p_file_sharing import P2PFileSharing
+from core.p2p_file_sharing import P2PFileSharing
 from status.status import Status
 
 
