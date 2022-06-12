@@ -303,7 +303,12 @@ class P2PFileSharing:
                       ', ' + str(filesize) + ')', 'Debug')
 
         self.data_receiver_sock.listen(1)
-        sock, _ = self.data_receiver_sock.accept()
+        self.data_receiver_sock.setblocking(0)
+        self.data_receiver_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+        try:
+            sock, _ = self.data_receiver_sock.accept()
+        except:
+            return Status.TRANSFER_INTERRUPTED
         sock.setblocking(0)
         sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
