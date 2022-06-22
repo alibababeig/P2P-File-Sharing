@@ -14,14 +14,18 @@ from chunk_manager.file_chunker import FileChunker
 from messages.ack import Ack
 from messages.discovery import Discovery
 from messages.offer import Offer
+from messages.packet_type import PacketType
 from ui.Cli import Cli
 from status.status import Status
 
 FILENAME_LENGTH_BYTES = 2
+PACKET_TYPE_BYTES = 1
 ENDIANNESS = 'little'
 
 BROADCAST_ADDR = '<broadcast>'
 BROADCAST_PORT = 12345
+# TX_PORT = 7337
+RX_PORT = 3773
 
 RX_REPO_PATH = './repository/rx'
 TX_REPO_PATH = './repository/tx'
@@ -34,18 +38,25 @@ MIN_PORT = 1024
 MAX_PORT = 65535
 
 SIMILARITY_THRESHOLD = 0.5
-TOPOLOGY_CONFIG_PATH = 'topology.conf'
-
+TOPOLOGY_CONFIG_PATH = './topology.conf'
+BACKLOG_COUNT = 5
 
 class P2PFileSharing:
     def __init__(self, chunck_size=10000):
         self.chunk_size = chunck_size  # Bytes
 
+        self.__tx_sock = socket(AF_INET, SOCK_STREAM)
+
+        self.__rx_sock = socket(AF_INET, SOCK_STREAM)
+        self.__rx_sock.bind(('', RX_PORT))
+
+        self.__routing_dict = dict()
+        self.__offers_dict = dict()
+
         self.__discovery_sock = None
         self.__offerer_sock = socket(AF_INET, SOCK_DGRAM)
         self.__data_receiver_sock = None
         # self.data_sender_sock = None
-
         self.__listener_sock = socket(AF_INET, SOCK_DGRAM)
         self.__listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.__listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
@@ -55,7 +66,8 @@ class P2PFileSharing:
         config = configparser.ConfigParser()
         config.read(TOPOLOGY_CONFIG_PATH)
         self.__host_id = int(config['Self']['HOST_ID'].replace(' ', ''))
-        self.__neighbour_ids = list(map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
+        self.__neighbour_ids = list(
+            map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
 
         Thread(target=self.__listen).start()
         Thread(target=self.__get_ack).start()
@@ -93,7 +105,8 @@ class P2PFileSharing:
 
         # TODO: send to all neighbours, set a valid seq number
         discovery = Discovery()
-        discovery.set_packet_data(req_filename, self.__host_id, self.__neighbour_ids[0], 0)
+        discovery.set_packet_data(
+            req_filename, self.__host_id, self.__neighbour_ids[0], 0)
 
         # for test
         new_discovery = Discovery()
@@ -106,51 +119,147 @@ class P2PFileSharing:
         self.__discovery_sock.sendto(
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
 
-    def __listen(self):
+    def __receive(self):
         Cli.print_log('LOG: __listen()', 'Debug')
-        buffer = defaultdict(bytes)
-        timestamps = defaultdict(int)
-        current_client = None
+        # buffer = defaultdict(bytes)
+        # timestamps = defaultdict(int)
+        # current_client = None
+
+        self.rx_sock.listen(BACKLOG_COUNT)
+        # self.rx_sock.setblocking(0)
 
         while True:
-            if current_client is None:
-                rec_bytes, client = self.__listener_sock.recvfrom(
-                    self.chunk_size)
-                if self.__is_myself(client):
-                    continue
+            sock, sender_addr = self.rx_sock.accept()
+            sock.settimeout(DATA_TRANSFER_TIMEOUT)
+            Thread(target=self.handle_connection,
+                   args=(sock, sender_addr)).start()
 
-                if timestamps[client] == 0:
-                    timestamps[client] = time.time()
-                buffer[client] += rec_bytes
-                current_client = client
+    def handle_connection(self, rec_sock, sender_addr):
+        buff = b''
 
-            else:
-                discovery = Discovery()
+        while len(buff) < 9:
+            buff += rec_sock.recv(self.chunk_size)
+
+        packet_type = int.from_bytes(buff[:1], ENDIANNESS)
+        src_host_id = int.from_bytes(buff[1:5], ENDIANNESS)
+        dst_host_id = int.from_bytes(buff[5:9], ENDIANNESS)
+
+        if packet_type == PacketType.DISCOVERY.value:
+            p = Discovery()
+        elif packet_type == PacketType.OFFER.value:
+            p = Offer()
+        elif packet_type == PacketType.ACK.value:
+            p = Ack()
+        # TODO
+        # elif packet_type == PacketType.DATA.value:
+        #     p = 
+        else:
+            rec_sock.close()
+            return
+
+        if dst_host_id != self.__host_id:
+            if dst_host_id not in self.__routing_dict:
+                rec_sock.close()
+                return
+
+            send_sock = socket(AF_INET, SOCK_STREAM)
+            send_sock.connect((self.__routing_dict[dst_host_id], RX_PORT))
+            send_sock.setblocking(0)
+            send_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+            cursor = 0
+            while True:
+                send_sock.send(buff[cursor:])
+                cursor += len(buff)
                 try:
-                    # The following line may raise an exception
-                    discovery.set_bytes(buffer[current_client])
-                    self.__send_offer(discovery.get_filename(), discovery.get_src_host_id(), current_client)
-                except ValueError:
-                    if not self.__is_expired(timestamps[current_client],
-                                             TRANSMISSION_TIMEOUT):
-                        rec_bytes, client = self.__listener_sock.recvfrom(
-                            self.chunk_size)
-                        if self.__is_myself(client):
-                            continue
+                    p.set_bytes(buff)
+                    return
+                except:
+                    buff += rec_sock.recv(self.chunk_size)
+                    
+        else:
+            while True:
+                try:
+                    p.set_bytes(buff)
+                    break
+                except:
+                    buff += rec_sock.recv(self.chunk_size)
 
-                        if timestamps[client] == 0:
-                            timestamps[client] = time.time()
-                        buffer[client] += rec_bytes
-                        continue
-                finally:
-                    del buffer[current_client]
-                    del timestamps[current_client]
+        if packet_type == PacketType.DISCOVERY.value:
+            self.__send_offer(p.get_filename(), dst_host_id, (self.__routing_dict[src_host_id], RX_PORT))
+        elif packet_type == PacketType.OFFER.value:
+            self.__offers_dict[p.get_src_host_id] = p.get_matching_files()
+        elif packet_type == PacketType.ACK.value:
+            # FIXME
+            self.__send_data(p.get_filename, (self.__routing_dict[src_host_id], RX_PORT))
+        # TODO
+        # elif packet_type == PacketType.DATA.value:
+        #     p = 
 
-                    if len(list(buffer.keys())) > 0:
-                        current_client = list(buffer.keys())[0]
-                    else:
-                        current_client = None
 
+            
+
+
+    # def __listen(self):
+    #     Cli.print_log('LOG: __listen()', 'Debug')
+    #     buffer = defaultdict(bytes)
+    #     timestamps = defaultdict(int)
+    #     current_client = None
+
+    #     self.rx_sock.listen(BACKLOG_COUNT)
+    #     self.rx_sock.setblocking(0)
+    #     self.rx_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+
+    #     while True:
+    #         try:
+    #             sock, client = self.rx_sock.accept()
+    #         except:
+    #             return Status.TRANSFER_INTERRUPTED
+    #         sock.setblocking(0)
+    #         sock.settimeout(DATA_TRANSFER_TIMEOUT)
+
+    #         if current_client is None:
+    #             # rec_bytes, client = self.__listener_sock.recvfrom(
+    #             #     self.chunk_size)
+    #             rec_bytes = sock.recv(self.chunk_size)
+
+    #             if self.__is_myself(client):
+    #                 continue
+
+    #             if timestamps[client] == 0:
+    #                 timestamps[client] = time.time()
+    #             buffer[client] += rec_bytes
+    #             current_client = client
+
+    #         else:
+    #             discovery = Discovery()
+    #             try:
+    #                 # The following line may raise an exception
+    #                 discovery.set_bytes(buffer[current_client])
+    #                 self.__send_offer(discovery.get_filename(
+    #                 ), discovery.get_src_host_id(), current_client)
+    #             except ValueError:
+    #                 if not self.__is_expired(timestamps[current_client],
+    #                                          TRANSMISSION_TIMEOUT):
+    #                     rec_bytes, client = self.__listener_sock.recvfrom(
+    #                         self.chunk_size)
+    #                     if self.__is_myself(client):
+    #                         continue
+
+    #                     if timestamps[client] == 0:
+    #                         timestamps[client] = time.time()
+    #                     buffer[client] += rec_bytes
+    #                     continue
+    #             finally:
+    #                 del buffer[current_client]
+    #                 del timestamps[current_client]
+
+    #                 if len(list(buffer.keys())) > 0:
+    #                     current_client = list(buffer.keys())[0]
+    #                 else:
+    #                     current_client = None
+    
+    
+    # FIXME
     def __send_offer(self, req_filename, dst_host_id, client):
         Cli.print_log('LOG: __send_offer(' + req_filename +
                       ', ' + str(client) + ')', 'Debug')
@@ -178,7 +287,7 @@ class P2PFileSharing:
         # TODO: set valid seq number
         offer = Offer()
         offer.set_packet_data(matching_files, self.__host_id, dst_host_id, 0)
-        
+
         # for test
         new_offer = Offer()
         b = offer.get_bytes()
