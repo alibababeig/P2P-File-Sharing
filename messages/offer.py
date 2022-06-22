@@ -28,8 +28,8 @@ class Offer:
 
         # _bytes = bytes(map(int, src_host_id.split('.')))
         # _bytes += bytes(map(int, dst_host_id.split('.')))
-        self.bytes = src_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
-        self.bytes += dst_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
+        _bytes = src_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
+        _bytes += dst_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
 
         match_cnt = len(self.matching_files)
         _bytes += match_cnt.to_bytes(MATCH_CNT_BYTES, ENDIANNESS)
