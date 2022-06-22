@@ -1,4 +1,5 @@
 import os
+import configparser
 import random
 import time
 
@@ -33,6 +34,7 @@ MIN_PORT = 1024
 MAX_PORT = 65535
 
 SIMILARITY_THRESHOLD = 0.5
+TOPOLOGY_CONFIG_PATH = 'topology.conf'
 
 
 class P2PFileSharing:
@@ -48,6 +50,12 @@ class P2PFileSharing:
         self.__listener_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.__listener_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         self.__listener_sock.bind(('', BROADCAST_PORT))
+
+        # read from conf file
+        config = configparser.ConfigParser()
+        config.read(TOPOLOGY_CONFIG_PATH)
+        self.__host_id = int(config['Self']['HOST_ID'].replace(' ', ''))
+        self.__neighbour_ids = list(map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
 
         Thread(target=self.__listen).start()
         Thread(target=self.__get_ack).start()
@@ -83,8 +91,16 @@ class P2PFileSharing:
         self.__discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.__discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
+        # TODO: send to all neighbours
         discovery = Discovery()
-        discovery.set_filename(req_filename)
+        discovery.set_filename(req_filename, self.__host_id, self.__neighbour_ids[0])
+
+        # for test
+        new_discovery = Discovery()
+        new_discovery.set_bytes(discovery.get_bytes())
+        print('src1: ', new_discovery.get_src_host_id())
+        print('dst1: ', new_discovery.get_dst_host_id())
+        print('filename: ', new_discovery.get_filename())
 
         self.__discovery_sock.sendto(
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
@@ -111,8 +127,10 @@ class P2PFileSharing:
                 discovery = Discovery()
                 try:
                     # The following line may raise an exception
+                    print('tag4')
                     discovery.set_bytes(buffer[current_client])
-                    self.__send_offer(discovery.get_filename(), current_client)
+                    print('tag1')
+                    self.__send_offer(discovery.get_filename(), discovery.get_src_host_id(), current_client)
                 except ValueError:
                     if not self.__is_expired(timestamps[current_client],
                                              TRANSMISSION_TIMEOUT):
@@ -134,7 +152,7 @@ class P2PFileSharing:
                     else:
                         current_client = None
 
-    def __send_offer(self, req_filename, client):
+    def __send_offer(self, req_filename, dst_host_id, client):
         Cli.print_log('LOG: __send_offer(' + req_filename +
                       ', ' + str(client) + ')', 'Debug')
         tx_filenames = [
@@ -159,8 +177,19 @@ class P2PFileSharing:
 
         # offer = Offer(matching_files=matching_files)
         offer = Offer()
-        offer.set_matching_files(matching_files)
-        self.__offerer_sock.sendto(offer.get_bytes(), client)
+        # ip=self.__get_host_ip('wlp3s0')
+        # print(f'host ip: {ip}')
+        # print(f'interfaces: {interfaces()}')
+        # dev_if = os.getenv('DEV_IF', 'wlp3s0')
+        offer.set_matching_files(matching_files, self.__host_id, dst_host_id)
+        
+        # for test
+        new_offer = Offer()
+        b = offer.get_bytes()
+        new_offer.set_bytes(b)
+        print('src1: ', new_offer.get_src_host_id())
+        print('dst1: ', new_offer.get_dst_host_id())
+        print('matched: ', new_offer.get_matching_files())
         # ack = self.__get_ack(client)
 
     def __get_offers(self):
@@ -383,12 +412,12 @@ class P2PFileSharing:
             return False
 
         myPort = self.__discovery_sock.getsockname()[1]
-        if client[0] in self.__get_host_ip() and client[1] == myPort:
+        if client[0] in self.__get_host_ips() and client[1] == myPort:
             return True
         else:
             return False
 
-    def __get_host_ip(self):
+    def __get_host_ips(self):
         if_ips = []
         for ifaceName in interfaces():
             address = [i['addr'] for i in ifaddresses(

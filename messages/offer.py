@@ -1,5 +1,5 @@
 MATCH_CNT_BYTES = 1
-IP_LEN_BYTES = 4
+HOST_ID_LEN_BYTES = 4
 FILENAME_LENGTH_BYTES = 2
 FILESIZE_BYTES = 5
 ENDIANNESS = 'little'
@@ -9,25 +9,27 @@ class Offer:
     def __init__(self):
         self.bytes = None
         self.matching_files = None
-        self.src_addr = None
-        self.dst_addr = None
+        self.__src_host_id = None
+        self.__dst_host_id = None
 
     def get_matching_files(self):
         return self.matching_files
 
-    def get_src_addr(self):
-        return self.src_addr
+    def get_src_host_id(self):
+        return self.__src_host_id
 
-    def get_dst_addr(self):
-        return self.dst_addr
+    def get_dst_host_id(self):
+        return self.__dst_host_id
 
-    def set_matching_files(self, matching_files, src_addr, dst_addr):
+    def set_matching_files(self, matching_files, src_host_id, dst_host_id):
         self.matching_files = matching_files[:2**(MATCH_CNT_BYTES * 8)]
-        self.src_addr = src_addr
-        self.dst_addr = dst_addr
+        self.__src_host_id = src_host_id
+        self.__dst_host_id = dst_host_id
 
-        _bytes = bytes(map(int, src_addr.split('.')))
-        _bytes += bytes(map(int, dst_addr.split('.')))
+        # _bytes = bytes(map(int, src_host_id.split('.')))
+        # _bytes += bytes(map(int, dst_host_id.split('.')))
+        self.bytes = src_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
+        self.bytes += dst_host_id.to_bytes(HOST_ID_LEN_BYTES, ENDIANNESS)
 
         match_cnt = len(self.matching_files)
         _bytes += match_cnt.to_bytes(MATCH_CNT_BYTES, ENDIANNESS)
@@ -50,14 +52,20 @@ class Offer:
         self.bytes = _bytes
         cursor = 0
 
-        self.src_addr = ''
-        for i in range(IP_LEN_BYTES):
-            self.src_addr += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == IP_LEN_BYTES-1 else '.')
-            cursor += 1
-        self.dst_addr = ''
-        for i in range(IP_LEN_BYTES):
-            self.dst_addr += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == IP_LEN_BYTES-1 else '.')
-            cursor += 1
+        # self.__src_host_id = ''
+        # for i in range(HOST_ID_LEN_BYTES):
+        #     self.__src_host_id += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == HOST_ID_LEN_BYTES-1 else '.')
+        #     cursor += 1
+        # self.__dst_host_id = ''
+        # for i in range(HOST_ID_LEN_BYTES):
+        #     self.__dst_host_id += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == HOST_ID_LEN_BYTES-1 else '.')
+        #     cursor += 1
+        self.__src_host_id = int.from_bytes(
+            self.bytes[cursor:cursor+HOST_ID_LEN_BYTES], ENDIANNESS)
+        cursor += HOST_ID_LEN_BYTES
+        self.__dst_host_id = int.from_bytes(
+            self.bytes[cursor:cursor+HOST_ID_LEN_BYTES], ENDIANNESS)
+        cursor += HOST_ID_LEN_BYTES
 
         match_cnt = int.from_bytes(
             self.bytes[cursor:cursor+MATCH_CNT_BYTES], ENDIANNESS)
