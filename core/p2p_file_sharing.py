@@ -91,16 +91,17 @@ class P2PFileSharing:
         self.__discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.__discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
-        # TODO: send to all neighbours
+        # TODO: send to all neighbours, set a valid seq number
         discovery = Discovery()
-        discovery.set_filename(req_filename, self.__host_id, self.__neighbour_ids[0])
+        discovery.set_packet_data(req_filename, self.__host_id, self.__neighbour_ids[0], 0)
 
         # for test
         new_discovery = Discovery()
         new_discovery.set_bytes(discovery.get_bytes())
-        print('src1: ', new_discovery.get_src_host_id())
-        print('dst1: ', new_discovery.get_dst_host_id())
-        print('filename: ', new_discovery.get_filename())
+        print('src_discovery: ', new_discovery.get_src_host_id())
+        print('dst_discovery: ', new_discovery.get_dst_host_id())
+        print('seq_discovery: ', new_discovery.get_seq_num())
+        print('filename_discovery: ', new_discovery.get_filename())
 
         self.__discovery_sock.sendto(
             discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
@@ -174,20 +175,18 @@ class P2PFileSharing:
             return
 
         # offer = Offer(matching_files=matching_files)
+        # TODO: set valid seq number
         offer = Offer()
-        # ip=self.__get_host_ip('wlp3s0')
-        # print(f'host ip: {ip}')
-        # print(f'interfaces: {interfaces()}')
-        # dev_if = os.getenv('DEV_IF', 'wlp3s0')
-        offer.set_matching_files(matching_files, self.__host_id, dst_host_id)
+        offer.set_packet_data(matching_files, self.__host_id, dst_host_id, 0)
         
         # for test
         new_offer = Offer()
         b = offer.get_bytes()
         new_offer.set_bytes(b)
-        print('src1: ', new_offer.get_src_host_id())
-        print('dst1: ', new_offer.get_dst_host_id())
-        print('matched: ', new_offer.get_matching_files())
+        print('src_offer: ', new_offer.get_src_host_id())
+        print('dst_offer: ', new_offer.get_dst_host_id())
+        print('seq_offer: ', new_offer.get_seq_num())
+        print('matched_offer: ', new_offer.get_matching_files())
 
         self.__offerer_sock.sendto(offer.get_bytes(), client)
         # ack = self.__get_ack(client)
