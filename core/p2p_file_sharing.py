@@ -127,9 +127,7 @@ class P2PFileSharing:
                 discovery = Discovery()
                 try:
                     # The following line may raise an exception
-                    print('tag4')
                     discovery.set_bytes(buffer[current_client])
-                    print('tag1')
                     self.__send_offer(discovery.get_filename(), discovery.get_src_host_id(), current_client)
                 except ValueError:
                     if not self.__is_expired(timestamps[current_client],
@@ -190,6 +188,8 @@ class P2PFileSharing:
         print('src1: ', new_offer.get_src_host_id())
         print('dst1: ', new_offer.get_dst_host_id())
         print('matched: ', new_offer.get_matching_files())
+
+        self.__offerer_sock.sendto(offer.get_bytes(), client)
         # ack = self.__get_ack(client)
 
     def __get_offers(self):
