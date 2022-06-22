@@ -1,4 +1,5 @@
 MATCH_CNT_BYTES = 1
+IP_LEN_BYTES = 4
 FILENAME_LENGTH_BYTES = 2
 FILESIZE_BYTES = 5
 ENDIANNESS = 'little'
@@ -6,17 +7,30 @@ ENDIANNESS = 'little'
 
 class Offer:
     def __init__(self):
-        self.matching_files = None
         self.bytes = None
+        self.matching_files = None
+        self.src_addr = None
+        self.dst_addr = None
 
     def get_matching_files(self):
         return self.matching_files
 
-    def set_matching_files(self, matching_files):
+    def get_src_addr(self):
+        return self.src_addr
+
+    def get_dst_addr(self):
+        return self.dst_addr
+
+    def set_matching_files(self, matching_files, src_addr, dst_addr):
         self.matching_files = matching_files[:2**(MATCH_CNT_BYTES * 8)]
+        self.src_addr = src_addr
+        self.dst_addr = dst_addr
+
+        _bytes = bytes(map(int, src_addr.split('.')))
+        _bytes += bytes(map(int, dst_addr.split('.')))
 
         match_cnt = len(self.matching_files)
-        _bytes = match_cnt.to_bytes(MATCH_CNT_BYTES, ENDIANNESS)
+        _bytes += match_cnt.to_bytes(MATCH_CNT_BYTES, ENDIANNESS)
 
         for dic in matching_files:
             filename = dic['name']
@@ -36,8 +50,17 @@ class Offer:
         self.bytes = _bytes
         cursor = 0
 
+        self.src_addr = ''
+        for i in range(IP_LEN_BYTES):
+            self.src_addr += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == IP_LEN_BYTES-1 else '.')
+            cursor += 1
+        self.dst_addr = ''
+        for i in range(IP_LEN_BYTES):
+            self.dst_addr += str(int.from_bytes(self.bytes[cursor:cursor+1], ENDIANNESS)) + ('' if i == IP_LEN_BYTES-1 else '.')
+            cursor += 1
+
         match_cnt = int.from_bytes(
-            self.bytes[:MATCH_CNT_BYTES], ENDIANNESS)
+            self.bytes[cursor:cursor+MATCH_CNT_BYTES], ENDIANNESS)
         cursor += MATCH_CNT_BYTES
 
         matching_files = []
@@ -61,5 +84,5 @@ class Offer:
 
         if cursor != len(self.bytes):
             raise ValueError()
-            
+
         self.matching_files = matching_files
