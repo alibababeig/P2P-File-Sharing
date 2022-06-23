@@ -14,10 +14,7 @@ class Ack:
         self.__seq_num = None
 
     def get_filename(self):
-        return self.__data[0]
-
-    def get_port_number(self):
-        return self.__data[1]
+        return self.__data
 
     def get_bytes(self):
         return self.__bytes
@@ -31,8 +28,8 @@ class Ack:
     def get_seq_num(self):
         return self.__seq_num
 
-    def set_packet_data(self, filename, port_number, src_host_id, dst_host_id, seq_num):
-        self.__data = (filename, port_number)
+    def set_packet_data(self, filename, src_host_id, dst_host_id, seq_num):
+        self.__data = filename
         self.__src_host_id = src_host_id
         self.__dst_host_id = dst_host_id
         self.__seq_num = seq_num
@@ -44,7 +41,7 @@ class Ack:
         filename_length = len(filename.encode('utf-8'))
         _bytes += filename_length.to_bytes(FILENAME_LENGTH_BYTES, ENDIANNESS)
         _bytes += filename.encode('utf-8')
-        _bytes += port_number.to_bytes(PORT_NUMBER_BYTES, ENDIANNESS)
+        # _bytes += port_number.to_bytes(PORT_NUMBER_BYTES, ENDIANNESS)
 
         self.__bytes = _bytes
 
@@ -69,14 +66,12 @@ class Ack:
             _bytes[cursor:cursor+FILENAME_LENGTH_BYTES], ENDIANNESS)
         cursor += FILENAME_LENGTH_BYTES
 
-        filename = _bytes[cursor:
+        self.__data = _bytes[cursor:
                           cursor + filename_length].decode('utf-8')
-        cursor += filename_length
-        port_number = int.from_bytes(
-            _bytes[cursor:], ENDIANNESS)
+        # cursor += filename_length
+        # port_number = int.from_bytes(
+        #     _bytes[cursor:], ENDIANNESS)
 
         if len(_bytes) != 2*HOST_ID_LEN_BYTES + SEQ_NUM_LEN_BYTES + \
-                FILENAME_LENGTH_BYTES + filename_length + PORT_NUMBER_BYTES:
+                FILENAME_LENGTH_BYTES + filename_length:
             raise ValueError()
-            
-        self.__data = (filename, port_number)
