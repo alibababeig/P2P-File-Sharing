@@ -54,7 +54,6 @@ class P2PFileSharing:
 
         self.__routing_dict = dict()
         self.__routing_dict_lock = threading.Lock()
-
         self.__offers_dict = dict()
         self.__offers_dict_flag = False
 
@@ -120,7 +119,7 @@ class P2PFileSharing:
         discovery.set_packet_data(
             req_filename, self.__host_id, BROADCAST_ID, curr_seq_num)
         for neighbour in self.__neighbour_ips:
-            Thread(target=self.__send_discovery_to_neighbour, args=(discovery, neighbour))
+            Thread(target=self.__send_discovery_to_neighbour, args=(discovery, neighbour)).start()
 
     def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
         discovery_sock = socket(AF_INET, SOCK_STREAM)
@@ -206,7 +205,7 @@ class P2PFileSharing:
             self.__send_offer(packet.get_filename(), src_host_id, (self.__routing_dict[src_host_id], RX_PORT))
             for neighbour in self.__neighbour_ips:
                 if neighbour != sender_ip:
-                    Thread(target=self.__send_discovery_to_neighbour(packet, neighbour))
+                    Thread(target=self.__send_discovery_to_neighbour(packet, neighbour)).start()
         elif packet_type == PacketType.OFFER.value:
             if self.__offers_dict_flag:
                 self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files()
@@ -376,6 +375,7 @@ class P2PFileSharing:
         Cli.print_log('LOG: __send_ack(' + str(choice) + ')', 'Debug')
         offerer_id, dic = choice
         filename = dic['name']
+        filesize = dic['size']
 
         ack = Ack()
         with self.__seq_num_lock:
@@ -466,7 +466,7 @@ class P2PFileSharing:
 
         file_chunker.close_file()
         data_sender_sock.close()
-        data_sender_sock = None
+        # data_sender_sock = None
 
     def __receive_data(self, filename, filesize):
         Cli.print_log('LOG: __receive_data(' + filename +
