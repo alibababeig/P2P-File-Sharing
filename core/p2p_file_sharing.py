@@ -184,7 +184,7 @@ class P2PFileSharing:
                     buff += rec_sock.recv(self.chunk_size)
 
             if packet_type == PacketType.METADATA.value:
-                buff = buff[cursor:]
+                buff = buff[PACKET_TYPE_BYTES + cursor:]
                 self.__process_data_packet(p, buff, rec_sock)
                 rec_sock.close()
             else:
@@ -222,7 +222,7 @@ class P2PFileSharing:
                 self.__offers_dict[packet.get_src_host_id()] = packet.get_matching_files(
                 )
         elif packet_type == PacketType.ACK.value:
-            self.__send_data(packet.get_filename, src_host_id)
+            self.__send_data(packet.get_filename(), src_host_id)
         else:
             Cli.print_log('Unknown packet type', 'Error')
 
