@@ -29,7 +29,7 @@ RX_REPO_PATH = './repository/rx'
 TX_REPO_PATH = './repository/tx'
 
 TRANSMISSION_TIMEOUT = 1  # seconds
-OFFER_TIMEOUT = 2  # seconds
+OFFER_TIMEOUT = 4  # seconds
 DATA_TRANSFER_TIMEOUT = 5  # seconds
 
 MIN_PORT = 1024
@@ -182,20 +182,21 @@ class P2PFileSharing:
         if packet_type == PacketType.METADATA.value:
             while True:
                 send_sock.send(buff[cursor:])
-                cursor += len(buff)
+                cursor = len(buff)
                 try:
-                    packet.set_bytes(buff[PACKET_TYPE_BYTES:])
+                    cursor = packet.set_bytes(buff[PACKET_TYPE_BYTES:])
                     break
                 except:
                     buff += rec_sock.recv(self.chunk_size)
             filesize = packet.get_filesize()
-            file_cursor = 0
-            while file_cursor < filesize:
-                buff += rec_sock.recv(self.chunk_size)
-                send_sock.send(buff[cursor:])
-                cursor += len(buff)
-                file_cursor += len(buff)
-                Cli.print_progress_bar(file_cursor, filesize, 13)
+            written_bytes = len(buff[PACKET_TYPE_BYTES + cursor:])
+            start_time = time.time()
+            while written_bytes < filesize:
+                buff = rec_sock.recv(self.chunk_size)
+                send_sock.send(buff)
+                written_bytes += len(buff)
+                download_speed = self.__calc_speed(written_bytes, start_time)
+                Cli.print_progress_bar(written_bytes, filesize, download_speed)
             return
 
         while True:
