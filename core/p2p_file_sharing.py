@@ -195,6 +195,7 @@ class P2PFileSharing:
                 send_sock.send(buff[cursor:])
                 cursor += len(buff)
                 file_cursor += len(buff)
+                Cli.print_progress_bar(file_cursor, filesize, 13)
             return
 
         while True:
