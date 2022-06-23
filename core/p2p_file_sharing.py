@@ -1,6 +1,7 @@
 import os
 import configparser
 import random
+import threading
 import time
 
 from collections import defaultdict
@@ -40,6 +41,7 @@ MAX_PORT = 65535
 SIMILARITY_THRESHOLD = 0.5
 TOPOLOGY_CONFIG_PATH = './topology.conf'
 BACKLOG_COUNT = 5
+BROADCAST_ID = -1
 
 class P2PFileSharing:
     def __init__(self, chunck_size=10000):
@@ -51,6 +53,8 @@ class P2PFileSharing:
         self.__rx_sock.bind(('', RX_PORT))
 
         self.__routing_dict = dict()
+        self.__routing_dict_lock = threading.Lock()
+
         self.__offers_dict = dict()
 
         self.__discovery_sock = None
@@ -66,11 +70,16 @@ class P2PFileSharing:
         config = configparser.ConfigParser()
         config.read(TOPOLOGY_CONFIG_PATH)
         self.__host_id = int(config['Self']['HOST_ID'].replace(' ', ''))
-        self.__neighbour_ids = list(
-            map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
+        self.__neighbour_ips = config['Neighbours']['HOST_IPS'].replace(' ', '').split(',')
+        self.__neighbour_ids = list(map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
+        # print(self.__neighbour_ips)
+        # print(self.__neighbour_ids)
 
-        Thread(target=self.__listen).start()
-        Thread(target=self.__get_ack).start()
+        self.__seq_num = random.randint(0, 2**32-1)
+        self.__seq_num_lock = threading.Lock()
+
+        Thread(target=self.__receive).start()
+        # Thread(target=self.__get_ack).start()
 
     def request_file(self):
         Cli.print_log('enter your query:', 'Info')
@@ -78,7 +87,7 @@ class P2PFileSharing:
         Cli.print_log('LOG: request_file(' + req_filename + ')', 'Debug')
         self.__send_discovery(req_filename)
 
-        offers = self.__get_offers()
+        # offers = self.__get_offers()
         Cli.show_offers(offers)
 
         if len(offers) == 0:
@@ -98,43 +107,40 @@ class P2PFileSharing:
 
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
-        self.__discovery_sock = socket(AF_INET, SOCK_DGRAM)
-        self.__discovery_sock.setblocking(0)
-        self.__discovery_sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        self.__discovery_sock.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
         # TODO: send to all neighbours, set a valid seq number
+        with self.__seq_num_lock:
+            curr_seq_num = self.__seq_num
+            self.__seq_num += 1
         discovery = Discovery()
         discovery.set_packet_data(
-            req_filename, self.__host_id, self.__neighbour_ids[0], 0)
+            req_filename, self.__host_id, BROADCAST_ID, curr_seq_num)
+        for neighbour in self.__neighbour_ips:
+            Thread(target=self.__send_discovery_to_neighbour, args=(discovery, neighbour))
 
-        # for test
-        new_discovery = Discovery()
-        new_discovery.set_bytes(discovery.get_bytes())
-        print('src_discovery: ', new_discovery.get_src_host_id())
-        print('dst_discovery: ', new_discovery.get_dst_host_id())
-        print('seq_discovery: ', new_discovery.get_seq_num())
-        print('filename_discovery: ', new_discovery.get_filename())
+    def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
+        discovery_sock = socket(AF_INET, SOCK_STREAM)
+        discovery_sock.setblocking(0)
+        discovery_sock.connect((neighbour_ip, RX_PORT))
 
-        self.__discovery_sock.sendto(
-            discovery.get_bytes(), (BROADCAST_ADDR, BROADCAST_PORT))
+        packet_type_bytes = PacketType.DISCOVERY.value.to_bytes(PACKET_TYPE_BYTES, ENDIANNESS)
+        discovery_sock.send(packet_type_bytes + discovery_packet)
+
+        discovery_sock.close()
 
     def __receive(self):
         Cli.print_log('LOG: __listen()', 'Debug')
-        # buffer = defaultdict(bytes)
-        # timestamps = defaultdict(int)
-        # current_client = None
 
-        self.rx_sock.listen(BACKLOG_COUNT)
+        self.__rx_sock.listen(BACKLOG_COUNT)
         # self.rx_sock.setblocking(0)
 
         while True:
-            sock, sender_addr = self.rx_sock.accept()
+            sock, sender_addr = self.__rx_sock.accept()
             sock.settimeout(DATA_TRANSFER_TIMEOUT)
-            Thread(target=self.handle_connection,
+            Thread(target=self.__handle_connection,
                    args=(sock, sender_addr)).start()
 
-    def handle_connection(self, rec_sock, sender_addr):
+    def __handle_connection(self, rec_sock, sender_addr):
         buff = b''
 
         while len(buff) < 9:
@@ -143,6 +149,8 @@ class P2PFileSharing:
         packet_type = int.from_bytes(buff[:1], ENDIANNESS)
         src_host_id = int.from_bytes(buff[1:5], ENDIANNESS)
         dst_host_id = int.from_bytes(buff[5:9], ENDIANNESS)
+        with self.__routing_dict_lock:
+            self.__routing_dict[src_host_id] = sender_addr[0]
 
         if packet_type == PacketType.DISCOVERY.value:
             p = Discovery()
@@ -157,25 +165,9 @@ class P2PFileSharing:
             rec_sock.close()
             return
 
-        if dst_host_id != self.__host_id:
-            if dst_host_id not in self.__routing_dict:
-                rec_sock.close()
-                return
-
-            send_sock = socket(AF_INET, SOCK_STREAM)
-            send_sock.connect((self.__routing_dict[dst_host_id], RX_PORT))
-            send_sock.setblocking(0)
-            send_sock.settimeout(DATA_TRANSFER_TIMEOUT)
-            cursor = 0
-            while True:
-                send_sock.send(buff[cursor:])
-                cursor += len(buff)
-                try:
-                    p.set_bytes(buff)
-                    return
-                except:
-                    buff += rec_sock.recv(self.chunk_size)
-                    
+        if dst_host_id != self.__host_id and packet_type != PacketType.DISCOVERY.value:
+            self.__redirect_packet(p, buff, dst_host_id, rec_sock)
+            rec_sock.close()
         else:
             while True:
                 try:
@@ -183,20 +175,44 @@ class P2PFileSharing:
                     break
                 except:
                     buff += rec_sock.recv(self.chunk_size)
+            rec_sock.close()
 
+            self.__process_packet(p, packet_type, src_host_id, sender_addr[0])
+            
+    def __redirect_packet(self, packet, buff, dst_host_id, rec_sock):
+        if dst_host_id not in self.__routing_dict:
+            return
+
+        send_sock = socket(AF_INET, SOCK_STREAM)
+        send_sock.connect((self.__routing_dict[dst_host_id], RX_PORT))
+        send_sock.setblocking(0)
+        send_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+        cursor = 0
+        while True:
+            send_sock.send(buff[cursor:])
+            cursor += len(buff)
+            try:
+                packet.set_bytes(buff)
+                return
+            except:
+                buff += rec_sock.recv(self.chunk_size)
+
+    def __process_packet(self, packet, packet_type, src_host_id, sender_ip):
         if packet_type == PacketType.DISCOVERY.value:
-            self.__send_offer(p.get_filename(), dst_host_id, (self.__routing_dict[src_host_id], RX_PORT))
+            self.__send_offer(packet.get_filename(), src_host_id, (self.__routing_dict[src_host_id], RX_PORT))
+            for neighbour in self.__neighbour_ips:
+                if neighbour != sender_ip:
+                    Thread(target=self.__send_discovery_to_neighbour(packet, neighbour))
         elif packet_type == PacketType.OFFER.value:
-            self.__offers_dict[p.get_src_host_id] = p.get_matching_files()
+            self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files()
         elif packet_type == PacketType.ACK.value:
             # FIXME
-            self.__send_data(p.get_filename, (self.__routing_dict[src_host_id], RX_PORT))
+            self.__send_data(packet.get_filename, (self.__routing_dict[src_host_id], RX_PORT))
         # TODO
         # elif packet_type == PacketType.DATA.value:
         #     p = 
 
 
-            
 
 
     # def __listen(self):
@@ -289,13 +305,13 @@ class P2PFileSharing:
         offer.set_packet_data(matching_files, self.__host_id, dst_host_id, 0)
 
         # for test
-        new_offer = Offer()
-        b = offer.get_bytes()
-        new_offer.set_bytes(b)
-        print('src_offer: ', new_offer.get_src_host_id())
-        print('dst_offer: ', new_offer.get_dst_host_id())
-        print('seq_offer: ', new_offer.get_seq_num())
-        print('matched_offer: ', new_offer.get_matching_files())
+        # new_offer = Offer()
+        # b = offer.get_bytes()
+        # new_offer.set_bytes(b)
+        # print('src_offer: ', new_offer.get_src_host_id())
+        # print('dst_offer: ', new_offer.get_dst_host_id())
+        # print('seq_offer: ', new_offer.get_seq_num())
+        # print('matched_offer: ', new_offer.get_matching_files())
 
         self.__offerer_sock.sendto(offer.get_bytes(), client)
         # ack = self.__get_ack(client)
