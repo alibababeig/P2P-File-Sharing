@@ -5,7 +5,6 @@ import threading
 import time
 
 from difflib import SequenceMatcher
-from netifaces import interfaces, ifaddresses, AF_INET
 from socket import socket, AF_INET, SOCK_STREAM, timeout
 from threading import Thread
 
@@ -75,7 +74,7 @@ class P2PFileSharing:
         self.__send_discovery(req_filename)
         # clear prev offers
         self.__offers_dict = dict()
-        time.sleep(5)
+        time.sleep(OFFER_TIMEOUT)
         self.__offers_dict_flag = False
         offers = self.__offers_dict
         Cli.show_offers(offers)
