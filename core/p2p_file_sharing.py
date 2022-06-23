@@ -56,6 +56,7 @@ class P2PFileSharing:
         self.__routing_dict_lock = threading.Lock()
 
         self.__offers_dict = dict()
+        self.__offers_dict_flag = False
 
         self.__discovery_sock = None
         self.__offerer_sock = socket(AF_INET, SOCK_DGRAM)
@@ -85,11 +86,15 @@ class P2PFileSharing:
         Cli.print_log('enter your query:', 'Info')
         req_filename = input()
         Cli.print_log('LOG: request_file(' + req_filename + ')', 'Debug')
+
+        self.__offers_dict_flag = True
         self.__send_discovery(req_filename)
-
-        # offers = self.__get_offers()
+        # clear prev offers
+        self.__offers_dict = dict()
+        time.sleep(5)
+        self.__offers_dict_flag = False
+        offers = self.__offers_dict
         Cli.show_offers(offers)
-
         if len(offers) == 0:
             return Status.NO_OFFERS
 
@@ -99,11 +104,10 @@ class P2PFileSharing:
 
         self.__send_ack(choice)
 
-        filename = choice[1]['name']
-        filesize = choice[1]['size']
-        status = self.__receive_data(filename, filesize)
-
-        return status
+        # filename = choice[1]['name']
+        # filesize = choice[1]['size']
+        # status = self.__receive_data(filename, filesize)
+        # return status
 
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
@@ -204,7 +208,8 @@ class P2PFileSharing:
                 if neighbour != sender_ip:
                     Thread(target=self.__send_discovery_to_neighbour(packet, neighbour))
         elif packet_type == PacketType.OFFER.value:
-            self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files()
+            if self.__offers_dict_flag:
+                self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files()
         elif packet_type == PacketType.ACK.value:
             # FIXME
             self.__send_data(packet.get_filename, (self.__routing_dict[src_host_id], RX_PORT))
@@ -369,66 +374,65 @@ class P2PFileSharing:
 
     def __send_ack(self, choice):
         Cli.print_log('LOG: __send_ack(' + str(choice) + ')', 'Debug')
-        offerer, dic = choice
+        offerer_id, dic = choice
         filename = dic['name']
-        while True:
-            try:
-                port_number = random.randint(MIN_PORT, MAX_PORT)
-                self.__data_receiver_sock = socket(AF_INET, SOCK_STREAM)
-                self.__data_receiver_sock.bind(('', port_number))
-                break
-            except OSError:
-                pass
 
         ack = Ack()
-        ack.set_data(filename, port_number)
-        self.__discovery_sock.sendto(ack.get_bytes(), offerer)
+        with self.__seq_num_lock:
+            curr_seq_num = self.__seq_num
+            self.__seq_num += 1
+        ack.set_packet_data(filename, self.__host_id, offerer_id, curr_seq_num)
 
-        self.__discovery_sock.close()
-        self.__discovery_sock = None
+        ack_sender_sock = socket(AF_INET, SOCK_STREAM)
+        ack_sender_sock.connect((self.__routing_dict[offerer_id], RX_PORT))
+        ack_sender_sock.setblocking(0)
+        ack_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
-    def __get_ack(self):
-        Cli.print_log('LOG: __get_ack()', 'Debug')
+        ack_sender_sock.send(PacketType.ACK.value + ack.get_bytes())
+        ack_sender_sock.close()
 
-        buffer = defaultdict(bytes)
-        timestamps = defaultdict(int)
-        current_client = None
+    # def __get_ack(self):
+    #     Cli.print_log('LOG: __get_ack()', 'Debug')
 
-        while True:
-            if current_client is None:
-                rec_bytes, client = self.__offerer_sock.recvfrom(
-                    self.chunk_size)
-                if timestamps[client] == 0:
-                    timestamps[client] = time.time()
-                buffer[client] += rec_bytes
-                current_client = client
+    #     buffer = defaultdict(bytes)
+    #     timestamps = defaultdict(int)
+    #     current_client = None
 
-            else:
-                ack = Ack()
-                try:
-                    # The following line may raise an exception
-                    ack.set_bytes(buffer[current_client])
-                    filename = ack.get_filename()
-                    final_addr = (current_client[0], ack.get_port_number())
-                    Thread(target=self.__send_data,
-                           args=(filename, final_addr)).start()
-                except ValueError:
-                    if not self.__is_expired(timestamps[current_client],
-                                             TRANSMISSION_TIMEOUT):
-                        rec_bytes, client = self.__offerer_sock.recvfrom(
-                            self.chunk_size)
-                        if timestamps[client] == 0:
-                            timestamps[client] = time.time()
-                        buffer[client] += rec_bytes
-                        continue
-                finally:
-                    del buffer[current_client]
-                    del timestamps[current_client]
+    #     while True:
+    #         if current_client is None:
+    #             rec_bytes, client = self.__offerer_sock.recvfrom(
+    #                 self.chunk_size)
+    #             if timestamps[client] == 0:
+    #                 timestamps[client] = time.time()
+    #             buffer[client] += rec_bytes
+    #             current_client = client
 
-                    if len(list(buffer.keys())) > 0:
-                        current_client = list(buffer.keys())[0]
-                    else:
-                        current_client = None
+    #         else:
+    #             ack = Ack()
+    #             try:
+    #                 # The following line may raise an exception
+    #                 ack.set_bytes(buffer[current_client])
+    #                 filename = ack.get_filename()
+    #                 final_addr = (current_client[0], ack.get_port_number())
+    #                 Thread(target=self.__send_data,
+    #                        args=(filename, final_addr)).start()
+    #             except ValueError:
+    #                 if not self.__is_expired(timestamps[current_client],
+    #                                          TRANSMISSION_TIMEOUT):
+    #                     rec_bytes, client = self.__offerer_sock.recvfrom(
+    #                         self.chunk_size)
+    #                     if timestamps[client] == 0:
+    #                         timestamps[client] = time.time()
+    #                     buffer[client] += rec_bytes
+    #                     continue
+    #             finally:
+    #                 del buffer[current_client]
+    #                 del timestamps[current_client]
+
+    #                 if len(list(buffer.keys())) > 0:
+    #                     current_client = list(buffer.keys())[0]
+    #                 else:
+    #                     current_client = None
 
     def __send_data(self, filename, client):
         Cli.print_log('LOG: __send_data(' + filename +
