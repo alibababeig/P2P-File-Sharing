@@ -14,6 +14,7 @@ from threading import Thread
 from chunk_manager.file_chunker import FileChunker
 from messages.ack import Ack
 from messages.discovery import Discovery
+from messages.metadata import Metadata
 from messages.offer import Offer
 from messages.packet_type import PacketType
 from ui.Cli import Cli
@@ -43,6 +44,7 @@ TOPOLOGY_CONFIG_PATH = './topology.conf'
 BACKLOG_COUNT = 5
 BROADCAST_ID = -1
 
+
 class P2PFileSharing:
     def __init__(self, chunck_size=10000):
         self.chunk_size = chunck_size  # Bytes
@@ -70,8 +72,10 @@ class P2PFileSharing:
         config = configparser.ConfigParser()
         config.read(TOPOLOGY_CONFIG_PATH)
         self.__host_id = int(config['Self']['HOST_ID'].replace(' ', ''))
-        self.__neighbour_ips = config['Neighbours']['HOST_IPS'].replace(' ', '').split(',')
-        self.__neighbour_ids = list(map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
+        self.__neighbour_ips = config['Neighbours']['HOST_IPS'].replace(
+            ' ', '').split(',')
+        self.__neighbour_ids = list(
+            map(int, config['Neighbours']['HOST_IDS'].replace(' ', '').split(',')))
         # print(self.__neighbour_ips)
         # print(self.__neighbour_ids)
 
@@ -111,7 +115,6 @@ class P2PFileSharing:
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
 
-        # TODO: send to all neighbours, set a valid seq number
         with self.__seq_num_lock:
             curr_seq_num = self.__seq_num
             self.__seq_num += 1
@@ -119,14 +122,16 @@ class P2PFileSharing:
         discovery.set_packet_data(
             req_filename, self.__host_id, BROADCAST_ID, curr_seq_num)
         for neighbour in self.__neighbour_ips:
-            Thread(target=self.__send_discovery_to_neighbour, args=(discovery, neighbour)).start()
+            Thread(target=self.__send_discovery_to_neighbour,
+                   args=(discovery, neighbour)).start()
 
     def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
         discovery_sock = socket(AF_INET, SOCK_STREAM)
         discovery_sock.setblocking(0)
         discovery_sock.connect((neighbour_ip, RX_PORT))
 
-        packet_type_bytes = PacketType.DISCOVERY.value.to_bytes(PACKET_TYPE_BYTES, ENDIANNESS)
+        packet_type_bytes = PacketType.DISCOVERY.value.to_bytes(
+            PACKET_TYPE_BYTES, ENDIANNESS)
         discovery_sock.send(packet_type_bytes + discovery_packet)
 
         discovery_sock.close()
@@ -161,9 +166,8 @@ class P2PFileSharing:
             p = Offer()
         elif packet_type == PacketType.ACK.value:
             p = Ack()
-        # TODO
-        # elif packet_type == PacketType.DATA.value:
-        #     p = 
+        elif packet_type == PacketType.METADATA.value:
+            p = Metadata()
         else:
             rec_sock.close()
             return
@@ -174,14 +178,20 @@ class P2PFileSharing:
         else:
             while True:
                 try:
-                    p.set_bytes(buff)
+                    cursor = p.set_bytes(buff)
                     break
                 except:
                     buff += rec_sock.recv(self.chunk_size)
-            rec_sock.close()
 
-            self.__process_packet(p, packet_type, src_host_id, sender_addr[0])
-            
+            if packet_type == PacketType.METADATA.value:
+                buff = buff[cursor:]
+                self.__process_data_packet(p, buff, rec_sock)
+                rec_sock.close()
+            else:
+                rec_sock.close()
+                self.__process_packet(
+                    p, packet_type, src_host_id, sender_addr[0])
+
     def __redirect_packet(self, packet, buff, dst_host_id, rec_sock):
         if dst_host_id not in self.__routing_dict:
             return
@@ -202,22 +212,64 @@ class P2PFileSharing:
 
     def __process_packet(self, packet, packet_type, src_host_id, sender_ip):
         if packet_type == PacketType.DISCOVERY.value:
-            self.__send_offer(packet.get_filename(), src_host_id, (self.__routing_dict[src_host_id], RX_PORT))
+            self.__send_offer(packet.get_filename(), src_host_id,
+                              (self.__routing_dict[src_host_id], RX_PORT))
             for neighbour in self.__neighbour_ips:
                 if neighbour != sender_ip:
-                    Thread(target=self.__send_discovery_to_neighbour(packet, neighbour)).start()
+                    Thread(target=self.__send_discovery_to_neighbour(
+                        packet, neighbour)).start()
         elif packet_type == PacketType.OFFER.value:
             if self.__offers_dict_flag:
-                self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files()
+                self.__offers_dict[packet.get_src_host_id] = packet.get_matching_files(
+                )
         elif packet_type == PacketType.ACK.value:
-            # FIXME
-            self.__send_data(packet.get_filename, (self.__routing_dict[src_host_id], RX_PORT))
-        # TODO
-        # elif packet_type == PacketType.DATA.value:
-        #     p = 
+            self.__send_data(packet.get_filename, src_host_id)
+        else:
+            Cli.print_log('Unknown packet type', 'Error')
 
+    def __process_data_packet(self, metadata_packet, buff, rec_sock):
+        filename = metadata_packet.get_filename()
+        filesize = metadata_packet.get_filesize()
+        Cli.print_log('LOG: __process_data_packet(' + filename +
+                      ', ' + str(filesize) + ')', 'Debug')
 
+        # self.__data_receiver_sock.listen(1)
+        # self.__data_receiver_sock.setblocking(0)
+        # self.__data_receiver_sock.settimeout(DATA_TRANSFER_TIMEOUT)
+        # try:
+        #     sock, _ = self.__data_receiver_sock.accept()
+        # except:
+        #     return Status.TRANSFER_INTERRUPTED
+        # sock.setblocking(0)
+        # sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
+        f = open(os.path.join(RX_REPO_PATH, filename), 'wb')
+        written_bytes = 0
+        status = Status.SUCCESS
+        start_time = time.time()
+        timer_start_time = start_time
+
+        while written_bytes < filesize:
+            f.write(buffer)
+            written_bytes += len(buffer)
+
+            try:
+                buffer = rec_sock.recv(self.chunk_size)
+                if len(buffer) > 0:
+                    timer_start_time = time.time()
+                if self.__is_expired(timer_start_time, DATA_TRANSFER_TIMEOUT):
+                    raise timeout
+            except timeout:
+                status = Status.TRANSFER_INTERRUPTED
+                Cli.print_log('')
+                break
+
+            download_speed = self.__calc_speed(written_bytes, start_time)
+            Cli.print_progress_bar(written_bytes, filesize, download_speed)
+
+        f.close()
+
+        return status
 
     # def __listen(self):
     #     Cli.print_log('LOG: __listen()', 'Debug')
@@ -277,9 +329,9 @@ class P2PFileSharing:
     #                     current_client = list(buffer.keys())[0]
     #                 else:
     #                     current_client = None
-    
-    
+
     # FIXME
+
     def __send_offer(self, req_filename, dst_host_id, client):
         Cli.print_log('LOG: __send_offer(' + req_filename +
                       ', ' + str(client) + ')', 'Debug')
@@ -303,19 +355,12 @@ class P2PFileSharing:
         if len(matching_files) == 0:
             return
 
-        # offer = Offer(matching_files=matching_files)
-        # TODO: set valid seq number
+        with self.__seq_num_lock:
+            curr_seq_num = self.__seq_num
+            self.__seq_num += 1
         offer = Offer()
-        offer.set_packet_data(matching_files, self.__host_id, dst_host_id, 0)
-
-        # for test
-        # new_offer = Offer()
-        # b = offer.get_bytes()
-        # new_offer.set_bytes(b)
-        # print('src_offer: ', new_offer.get_src_host_id())
-        # print('dst_offer: ', new_offer.get_dst_host_id())
-        # print('seq_offer: ', new_offer.get_seq_num())
-        # print('matched_offer: ', new_offer.get_matching_files())
+        offer.set_packet_data(
+            matching_files, self.__host_id, dst_host_id, curr_seq_num)
 
         self.__offerer_sock.sendto(offer.get_bytes(), client)
         # ack = self.__get_ack(client)
@@ -434,19 +479,28 @@ class P2PFileSharing:
     #                 else:
     #                     current_client = None
 
-    def __send_data(self, filename, client):
+    def __send_data(self, filename, client_id):
         Cli.print_log('LOG: __send_data(' + filename +
-                      ', ' + str(client) + ')', 'Debug')
+                      ', ' + str(client_id) + ')', 'Debug')
 
         data_sender_sock = socket(AF_INET, SOCK_STREAM)
-        data_sender_sock.connect(client)
+        data_sender_sock.connect((self.__routing_dict[client_id], RX_PORT))
         data_sender_sock.setblocking(0)
         data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
         file_chunker = FileChunker(
             os.path.join(TX_REPO_PATH, filename), self.chunk_size)
 
+        with self.__seq_num_lock:
+            curr_seq_num = self.__seq_num
+            self.__seq_num += 1
+
         filesize = file_chunker.get_file_size()
+
+        metadata = Metadata()
+        metadata.set_packet_data(filename, filesize, self.__host_id,
+                                 client_id, curr_seq_num)
+        data_sender_sock.send(metadata.get_bytes())
 
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
@@ -466,7 +520,6 @@ class P2PFileSharing:
 
         file_chunker.close_file()
         data_sender_sock.close()
-        # data_sender_sock = None
 
     def __receive_data(self, filename, filesize):
         Cli.print_log('LOG: __receive_data(' + filename +
