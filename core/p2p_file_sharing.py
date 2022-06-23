@@ -150,7 +150,7 @@ class P2PFileSharing:
             return
 
         if dst_host_id != self.__host_id and packet_type != PacketType.DISCOVERY.value:
-            self.__redirect_packet(p, buff, dst_host_id, rec_sock)
+            self.__redirect_packet(p, buff, dst_host_id, packet_type, rec_sock)
             rec_sock.close()
         else:
             while True:
@@ -169,7 +169,7 @@ class P2PFileSharing:
                 self.__process_packet(
                     p, packet_type, src_host_id, sender_addr[0])
 
-    def __redirect_packet(self, packet, buff, dst_host_id, rec_sock):
+    def __redirect_packet(self, packet, buff, dst_host_id, packet_type, rec_sock):
         if dst_host_id not in self.__routing_dict:
             return
 
@@ -178,6 +178,25 @@ class P2PFileSharing:
         send_sock.setblocking(0)
         send_sock.settimeout(DATA_TRANSFER_TIMEOUT)
         cursor = 0
+
+        if packet_type == PacketType.METADATA.value:
+            while True:
+                send_sock.send(buff[cursor:])
+                cursor += len(buff)
+                try:
+                    packet.set_bytes(buff[PACKET_TYPE_BYTES:])
+                    break
+                except:
+                    buff += rec_sock.recv(self.chunk_size)
+            filesize = packet.get_filesize()
+            file_cursor = 0
+            while file_cursor < filesize:
+                buff += rec_sock.recv(self.chunk_size)
+                send_sock.send(buff[cursor:])
+                cursor += len(buff)
+                file_cursor += len(buff)
+            return
+
         while True:
             send_sock.send(buff[cursor:])
             cursor += len(buff)
