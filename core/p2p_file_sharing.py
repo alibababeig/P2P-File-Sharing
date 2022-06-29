@@ -14,7 +14,7 @@ from messages.discovery import Discovery
 from messages.metadata import Metadata
 from messages.offer import Offer
 from messages.packet_type import PacketType
-from ui.Cli import Cli
+from ui.cli import Cli
 from status.status import Status
 
 FILENAME_LENGTH_BYTES = 2

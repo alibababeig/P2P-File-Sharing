@@ -1,5 +1,5 @@
 import argparse
-from ui.Cli import Cli
+from ui.cli import Cli
 from core.p2p_file_sharing import P2PFileSharing
 from status.status import Status
 
