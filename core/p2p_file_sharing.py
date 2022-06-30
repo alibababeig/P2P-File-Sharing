@@ -21,8 +21,8 @@ FILENAME_LENGTH_BYTES = 2
 PACKET_TYPE_BYTES = 1
 ENDIANNESS = 'little'
 
-BROADCAST_ADDR = '<broadcast>'
-BROADCAST_PORT = 12345
+# BROADCAST_ADDR = '<broadcast>'
+# BROADCAST_PORT = 12345
 RX_PORT = 3773
 
 RX_REPO_PATH = './repository/rx'
@@ -40,6 +40,7 @@ SIMILARITY_THRESHOLD = 0.5
 TOPOLOGY_CONFIG_PATH = './topology.conf'
 BACKLOG_COUNT = 5
 BROADCAST_ID = 2 ** 32 - 1
+EPSILON = 0.0001
 
 
 class P2PFileSharing:
@@ -91,8 +92,6 @@ class P2PFileSharing:
 
         self.__send_ack(choice)
 
-        # return status
-
     def __send_discovery(self, req_filename):
         Cli.print_log('LOG: __send_discovery(' + req_filename + ')', 'Debug')
 
@@ -109,7 +108,6 @@ class P2PFileSharing:
     def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
         discovery_sock = socket(AF_INET, SOCK_STREAM)
         discovery_sock.settimeout(DATA_TRANSFER_TIMEOUT)
-        # discovery_sock.setblocking(0)
         try:
             discovery_sock.connect((neighbour_ip, RX_PORT))
         except:
@@ -131,8 +129,6 @@ class P2PFileSharing:
         Cli.print_log('LOG: __listen()', 'Debug')
 
         self.__rx_sock.listen(BACKLOG_COUNT)
-        # self.rx_sock.setblocking(0)
-
         while True:
             sock, sender_addr = self.__rx_sock.accept()
             sock.settimeout(DATA_TRANSFER_TIMEOUT)
@@ -141,7 +137,6 @@ class P2PFileSharing:
 
     def __handle_connection(self, rec_sock, sender_addr):
         buff = b''
-
         while len(buff) < 9:
             try:
                 buff += rec_sock.recv(self.chunk_size)
@@ -293,16 +288,6 @@ class P2PFileSharing:
         filesize = metadata_packet.get_filesize()
         Cli.print_log('LOG: __process_data_packet(' + filename +
                       ', ' + str(filesize) + ')', 'Debug')
-
-        # self.__data_receiver_sock.listen(1)
-        # self.__data_receiver_sock.setblocking(0)
-        # self.__data_receiver_sock.settimeout(DATA_TRANSFER_TIMEOUT)
-        # try:
-        #     sock, _ = self.__data_receiver_sock.accept()
-        # except:
-        #     return Status.TRANSFER_INTERRUPTED
-        # sock.setblocking(0)
-        # sock.settimeout(DATA_TRANSFER_TIMEOUT)
         buffer = buff
 
         f = open(os.path.join(RX_REPO_PATH, filename), 'wb')
@@ -475,7 +460,7 @@ class P2PFileSharing:
 
     def __calc_speed(self, bytes_cnt, start_time):
         current_time = time.time()
-        speed = bytes_cnt / (current_time - start_time)
+        speed = bytes_cnt / (current_time - start_time + EPSILON)
 
         if speed < 1000:
             return f'{speed} B/s'
