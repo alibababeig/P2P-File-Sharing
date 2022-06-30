@@ -108,6 +108,7 @@ class P2PFileSharing:
 
     def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
         discovery_sock = socket(AF_INET, SOCK_STREAM)
+        discovery_sock.settimeout(DATA_TRANSFER_TIMEOUT)
         # discovery_sock.setblocking(0)
         try:
             discovery_sock.connect((neighbour_ip, RX_PORT))
@@ -118,7 +119,11 @@ class P2PFileSharing:
 
         packet_type_bytes = PacketType.DISCOVERY.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
-        discovery_sock.send(packet_type_bytes + discovery_packet.get_bytes())
+        try:
+            discovery_sock.send(packet_type_bytes +
+                                discovery_packet.get_bytes())
+        except:
+            Cli.print_log('\ntransmission interrupted', 'Error')
 
         discovery_sock.close()
 
@@ -138,7 +143,11 @@ class P2PFileSharing:
         buff = b''
 
         while len(buff) < 9:
-            buff += rec_sock.recv(self.chunk_size)
+            try:
+                buff += rec_sock.recv(self.chunk_size)
+            except:
+                Cli.print_log('\ntransmission interrupted', 'Error')
+                return
 
         packet_type = int.from_bytes(buff[:1], ENDIANNESS)
         src_host_id = int.from_bytes(buff[1:5], ENDIANNESS)
@@ -167,7 +176,11 @@ class P2PFileSharing:
                     cursor = p.set_bytes(buff[PACKET_TYPE_BYTES:])
                     break
                 except:
-                    buff += rec_sock.recv(self.chunk_size)
+                    try:
+                        buff += rec_sock.recv(self.chunk_size)
+                    except:
+                        Cli.print_log('\ntransmission interrupted', 'Error')
+                        return
 
             if packet_type == PacketType.METADATA.value:
                 buff = buff[PACKET_TYPE_BYTES + cursor:]
@@ -195,32 +208,53 @@ class P2PFileSharing:
 
         if packet_type == PacketType.METADATA.value:
             while True:
-                send_sock.send(buff[cursor:])
+                try:
+                    send_sock.send(buff[cursor:])
+                except:
+                    Cli.print_log('\ntransmission interrupted', 'Error')
+                    return
                 cursor = len(buff)
                 try:
                     cursor = packet.set_bytes(buff[PACKET_TYPE_BYTES:])
                     break
                 except:
-                    buff += rec_sock.recv(self.chunk_size)
+                    try:
+                        buff += rec_sock.recv(self.chunk_size)
+                    except:
+                        Cli.print_log('\ntransmission interrupted', 'Error')
+                        send_sock.close()
+                        return
             filesize = packet.get_filesize()
             written_bytes = len(buff[PACKET_TYPE_BYTES + cursor:])
             start_time = time.time()
             while written_bytes < filesize:
-                buff = rec_sock.recv(self.chunk_size)
-                send_sock.send(buff)
+                try:
+                    buff = rec_sock.recv(self.chunk_size)
+                    send_sock.send(buff)
+                except:
+                    Cli.print_log('\ntransmission interrupted', 'Error')
+                    break
                 written_bytes += len(buff)
                 download_speed = self.__calc_speed(written_bytes, start_time)
                 Cli.print_progress_bar(written_bytes, filesize, download_speed)
             return
 
         while True:
-            send_sock.send(buff[cursor:])
+            try:
+                send_sock.send(buff[cursor:])
+            except:
+                Cli.print_log('\ntransmission interrupted', 'Error')
+                break
             cursor += len(buff)
             try:
                 packet.set_bytes(buff[PACKET_TYPE_BYTES:])
                 return
             except:
-                buff += rec_sock.recv(self.chunk_size)
+                try:
+                    buff += rec_sock.recv(self.chunk_size)
+                except:
+                    Cli.print_log('\ntransmission interrupted', 'Error')
+                    break
 
     def __process_packet(self, packet, packet_type, src_host_id, sender_ip):
         if packet_type == PacketType.DISCOVERY.value:
@@ -287,9 +321,9 @@ class P2PFileSharing:
                     timer_start_time = time.time()
                 if self.__is_expired(timer_start_time, DATA_TRANSFER_TIMEOUT):
                     raise timeout
-            except timeout:
+            except:
                 status = Status.TRANSFER_INTERRUPTED
-                Cli.print_log('')
+                Cli.print_log('\ntransmission interrupted', 'Error')
                 break
 
             download_speed = self.__calc_speed(written_bytes, start_time)
@@ -331,6 +365,7 @@ class P2PFileSharing:
             matching_files, self.__host_id, dst_host_id, curr_seq_num)
 
         sock = socket(AF_INET, SOCK_STREAM)
+        sock.settimeout(DATA_TRANSFER_TIMEOUT)
         try:
             sock.connect(client)
         except:
@@ -340,7 +375,10 @@ class P2PFileSharing:
 
         packet_type_bytes = PacketType.OFFER.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
-        sock.send(packet_type_bytes + offer.get_bytes())
+        try:
+            sock.send(packet_type_bytes + offer.get_bytes())
+        except:
+            Cli.print_log('\ntransmission interrupted', 'Error')
 
         sock.close()
 
@@ -368,7 +406,10 @@ class P2PFileSharing:
 
         packet_type_bytes = PacketType.ACK.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
-        ack_sender_sock.send(packet_type_bytes + ack.get_bytes())
+        try:
+            ack_sender_sock.send(packet_type_bytes + ack.get_bytes())
+        except:
+            Cli.print_log('\ntransmission interrupted', 'Error')
 
         ack_sender_sock.close()
 
@@ -400,7 +441,11 @@ class P2PFileSharing:
                                  client_id, curr_seq_num)
         packet_type_bytes = PacketType.METADATA.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
-        data_sender_sock.send(packet_type_bytes + metadata.get_bytes())
+        try:
+            data_sender_sock.send(packet_type_bytes + metadata.get_bytes())
+        except:
+            Cli.print_log('\ntransmission interrupted', 'Error')
+            return
 
         chunk = file_chunker.get_next_chunk()
         bytes_sent = 0
