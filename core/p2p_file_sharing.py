@@ -31,6 +31,7 @@ TX_REPO_PATH = './repository/tx'
 TRANSMISSION_TIMEOUT = 1  # seconds
 OFFER_TIMEOUT = 4  # seconds
 DATA_TRANSFER_TIMEOUT = 5  # seconds
+RECENT_PACKET_EXPIRATION = 10  # seconds
 
 MIN_PORT = 1024
 MAX_PORT = 65535
@@ -62,6 +63,9 @@ class P2PFileSharing:
 
         self.__seq_num = random.randint(0, 2**32-1)
         self.__seq_num_lock = threading.Lock()
+
+        self.__recent_packets = []
+        self.__recent_packets_lock = threading.Lock()
 
         Thread(target=self.__receive).start()
 
@@ -210,6 +214,19 @@ class P2PFileSharing:
 
     def __process_packet(self, packet, packet_type, src_host_id, sender_ip):
         if packet_type == PacketType.DISCOVERY.value:
+            pkt_src_id = packet.get_src_host_id()
+            pkt_seq_num = packet.get_seq_num()
+            timestamp = time.time()
+
+            with self.__recent_packets_lock:
+                for i, arr in enumerate(self.__recent_packets):
+                    if pkt_src_id == arr[0] and pkt_seq_num == arr[1]:
+                        if timestamp > arr[2]:
+                            self.__recent_packets[i][2] = timestamp
+                        return
+                self.__update_recent_packets(
+                    pkt_src_id, pkt_seq_num, timestamp)
+
             self.__send_offer(packet.get_filename(), src_host_id)
             for neighbour in self.__neighbour_ips:
                 if neighbour != sender_ip:
@@ -375,6 +392,13 @@ class P2PFileSharing:
 
         file_chunker.close_file()
         data_sender_sock.close()
+
+    def __update_recent_packets(self, src_id, seq_num, timestamp):
+        now = time.time()
+        for i in range(len(self.__recent_packets) - 1, -1, -1):
+            if now - self.__recent_packets[i][2] > RECENT_PACKET_EXPIRATION:
+                self.__recent_packets.pop(i)
+        self.__recent_packets.append([src_id, seq_num, timestamp])
 
     def __calc_speed(self, bytes_cnt, start_time):
         current_time = time.time()
