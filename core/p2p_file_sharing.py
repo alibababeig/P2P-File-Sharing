@@ -109,7 +109,12 @@ class P2PFileSharing:
     def __send_discovery_to_neighbour(self, discovery_packet, neighbour_ip):
         discovery_sock = socket(AF_INET, SOCK_STREAM)
         # discovery_sock.setblocking(0)
-        discovery_sock.connect((neighbour_ip, RX_PORT))
+        try:
+            discovery_sock.connect((neighbour_ip, RX_PORT))
+        except:
+            Cli.print_log(
+                f'connection to {neighbour_ip}:{RX_PORT} refused', 'Error')
+            return
 
         packet_type_bytes = PacketType.DISCOVERY.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
@@ -178,7 +183,12 @@ class P2PFileSharing:
             return
 
         send_sock = socket(AF_INET, SOCK_STREAM)
-        send_sock.connect((self.__routing_dict[dst_host_id], RX_PORT))
+        try:
+            send_sock.connect((self.__routing_dict[dst_host_id], RX_PORT))
+        except:
+            Cli.print_log(
+                f'connection to {self.__routing_dict[dst_host_id]}:{RX_PORT} refused', 'Error')
+            return
         send_sock.setblocking(0)
         send_sock.settimeout(DATA_TRANSFER_TIMEOUT)
         cursor = 0
@@ -321,7 +331,12 @@ class P2PFileSharing:
             matching_files, self.__host_id, dst_host_id, curr_seq_num)
 
         sock = socket(AF_INET, SOCK_STREAM)
-        sock.connect(client)
+        try:
+            sock.connect(client)
+        except:
+            Cli.print_log(
+                f'connection to {client[0]}:{client[1]} refused', 'Error')
+            return
 
         packet_type_bytes = PacketType.OFFER.value.to_bytes(
             PACKET_TYPE_BYTES, ENDIANNESS)
@@ -342,7 +357,12 @@ class P2PFileSharing:
         ack.set_packet_data(filename, self.__host_id, offerer_id, curr_seq_num)
 
         ack_sender_sock = socket(AF_INET, SOCK_STREAM)
-        ack_sender_sock.connect((self.__routing_dict[offerer_id], RX_PORT))
+        try:
+            ack_sender_sock.connect((self.__routing_dict[offerer_id], RX_PORT))
+        except:
+            Cli.print_log(
+                f'connection to {self.__routing_dict[offerer_id]}:{RX_PORT} refused', 'Error')
+            return
         ack_sender_sock.setblocking(0)
         ack_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
@@ -357,7 +377,12 @@ class P2PFileSharing:
                       ', ' + str(client_id) + ')', 'Debug')
 
         data_sender_sock = socket(AF_INET, SOCK_STREAM)
-        data_sender_sock.connect((self.__routing_dict[client_id], RX_PORT))
+        try:
+            data_sender_sock.connect((self.__routing_dict[client_id], RX_PORT))
+        except:
+            Cli.print_log(
+                f'connection to {self.__routing_dict[client_id]}:{RX_PORT} refused', 'Error')
+            return
         data_sender_sock.setblocking(0)
         data_sender_sock.settimeout(DATA_TRANSFER_TIMEOUT)
 
