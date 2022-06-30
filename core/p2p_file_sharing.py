@@ -218,6 +218,9 @@ class P2PFileSharing:
             pkt_seq_num = packet.get_seq_num()
             timestamp = time.time()
 
+            if pkt_src_id == self.__host_id:
+                return
+
             with self.__recent_packets_lock:
                 for i, arr in enumerate(self.__recent_packets):
                     if pkt_src_id == arr[0] and pkt_seq_num == arr[1]:
