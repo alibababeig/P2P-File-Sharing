@@ -4,7 +4,7 @@ from ui.color import Color
 
 
 class Cli:
-    offer_row = '{}{: <7}{}{: <25}{: <13}{:}'
+    offer_row = '{}{: <7}{}{: <15}{: <13}{:}'
 
     @staticmethod
     def print_log(str, _type: Literal['Debug', 'Info', 'Error', 'Success'] = 'Info'):
@@ -53,7 +53,7 @@ class Cli:
     @staticmethod
     def show_offers(offers):
         print(Color.BOLD.value + Cli.offer_row
-              .format('', '', '', 'Offerer Address', 'File Size', 'File Name') + Color.ENDC.value)
+              .format('', '', '', 'Offerer ID', 'File Size', 'File Name') + Color.ENDC.value)
         line = 0
         for offerer, matching_files in offers.items():
             for dic in matching_files:
