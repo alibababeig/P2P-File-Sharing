@@ -7,7 +7,9 @@ class Cli:
     offer_row = '{}{: <7}{}{: <15}{: <13}{:}'
 
     @staticmethod
-    def print_log(str, _type: Literal['Debug', 'Info', 'Error', 'Success'] = 'Info'):
+    def print_log(str, _type: Literal['Debug', 'Info', 'Error', 'Success'] = 'Info', print_log=False):
+        if not print_log and _type == 'Debug':
+            return
         s = ''
         if _type == 'Debug':
             s += Color.WARNING.value
